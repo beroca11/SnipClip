@@ -162,8 +162,12 @@ RESTful endpoints for all major operations:
 - June 25, 2025. Database migration completed - Moved from memory storage to PostgreSQL for multi-user support
 - June 25, 2025. Enhanced keyboard shortcuts - Added customizable keyboard shortcuts with user preference settings
 - June 25, 2025. Fixed snippet functionality - Resolved database connection and added default snippets
+- June 25, 2025. Enhanced settings functionality - Added working save button for keyboard shortcuts
+- June 25, 2025. Simplified clipboard history display - Removed containers and spacing for clean text list
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
 Design preferences: Clean, modern interface with Coinbase-style blue accents and professional typography.
+Clipboard history preference: Simple list format with small text, no containers or spacing between items.
+Settings preference: Functional save button for keyboard shortcuts customization.
