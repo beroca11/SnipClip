@@ -9,6 +9,8 @@ import {
   type Settings,
   type InsertSettings
 } from "@shared/schema";
+import { db } from "./db";
+import { eq, desc } from "drizzle-orm";
 
 export interface IStorage {
   // Snippets
@@ -201,4 +203,98 @@ Best regards,
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  // Snippets
+  async getSnippets(): Promise<Snippet[]> {
+    return await db.select().from(snippets).orderBy(desc(snippets.createdAt));
+  }
+
+  async getSnippet(id: number): Promise<Snippet | undefined> {
+    const [snippet] = await db.select().from(snippets).where(eq(snippets.id, id));
+    return snippet;
+  }
+
+  async getSnippetByTrigger(trigger: string): Promise<Snippet | undefined> {
+    const [snippet] = await db.select().from(snippets).where(eq(snippets.trigger, trigger));
+    return snippet;
+  }
+
+  async createSnippet(snippet: InsertSnippet): Promise<Snippet> {
+    const [newSnippet] = await db.insert(snippets).values({
+      ...snippet,
+      updatedAt: new Date()
+    }).returning();
+    return newSnippet;
+  }
+
+  async updateSnippet(id: number, updateData: Partial<InsertSnippet>): Promise<Snippet | undefined> {
+    const [updated] = await db.update(snippets)
+      .set({ ...updateData, updatedAt: new Date() })
+      .where(eq(snippets.id, id))
+      .returning();
+    return updated;
+  }
+
+  async deleteSnippet(id: number): Promise<boolean> {
+    const result = await db.delete(snippets).where(eq(snippets.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Clipboard
+  async getClipboardItems(): Promise<ClipboardItem[]> {
+    return await db.select().from(clipboardItems).orderBy(desc(clipboardItems.createdAt)).limit(100);
+  }
+
+  async createClipboardItem(item: InsertClipboardItem): Promise<ClipboardItem> {
+    const [newItem] = await db.insert(clipboardItems).values(item).returning();
+    
+    // Clean up old items beyond limit
+    const allItems = await db.select().from(clipboardItems).orderBy(desc(clipboardItems.createdAt));
+    if (allItems.length > 100) {
+      const toDelete = allItems.slice(100);
+      for (const item of toDelete) {
+        await db.delete(clipboardItems).where(eq(clipboardItems.id, item.id));
+      }
+    }
+    
+    return newItem;
+  }
+
+  async deleteClipboardItem(id: number): Promise<boolean> {
+    const result = await db.delete(clipboardItems).where(eq(clipboardItems.id, id));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async clearClipboardHistory(): Promise<void> {
+    await db.delete(clipboardItems);
+  }
+
+  // Settings
+  async getSettings(): Promise<Settings> {
+    const [setting] = await db.select().from(settings).limit(1);
+    if (!setting) {
+      // Create default settings
+      const [newSettings] = await db.insert(settings).values({
+        snippetShortcut: "ctrl+;",
+        clipboardShortcut: "ctrl+shift+v",
+        clipboardEnabled: 1,
+        historyLimit: 100,
+        launchOnStartup: 0,
+        theme: "light"
+      }).returning();
+      return newSettings;
+    }
+    return setting;
+  }
+
+  async updateSettings(updateData: Partial<InsertSettings>): Promise<Settings> {
+    const currentSettings = await this.getSettings();
+    const [updated] = await db.update(settings)
+      .set(updateData)
+      .where(eq(settings.id, currentSettings.id))
+      .returning();
+    return updated;
+  }
+}
+
+export const storage = new DatabaseStorage();
