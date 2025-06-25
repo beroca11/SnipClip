@@ -101,6 +101,13 @@ export default function Dashboard() {
                   <span>Clipboard</span>
                   <span className="text-xs bg-blue-700 px-2 py-1 rounded-lg">Ctrl+Shift+V</span>
                 </Button>
+                <Button 
+                  onClick={() => setSettingsModalOpen(true)}
+                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl shadow-sm"
+                >
+                  <Settings className="h-4 w-4" />
+                  <span>Settings</span>
+                </Button>
               </div>
             </div>
 
