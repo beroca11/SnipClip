@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { PlusCircle, Save, X } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Plus, Save, X } from "lucide-react";
+import { PopupOverlay } from "@/components/popup-overlay";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { insertSnippetSchema, type Snippet } from "@shared/schema";
-import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { insertSnippetSchema, type Snippet, type InsertSnippet } from "@shared/schema";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 
 interface SnippetEditorProps {
   isOpen: boolean;
@@ -18,242 +20,251 @@ interface SnippetEditorProps {
   editingSnippet?: Snippet | null;
 }
 
-const formSchema = insertSnippetSchema.extend({
-  title: z.string().min(1, "Title is required"),
-  content: z.string().min(1, "Content is required"),
-  trigger: z.string().min(1, "Trigger is required").regex(/^[a-zA-Z0-9_-]+$/, "Trigger can only contain letters, numbers, underscores, and hyphens"),
-});
-
 export default function SnippetEditor({ isOpen, onClose, editingSnippet }: SnippetEditorProps) {
-  const [formData, setFormData] = useState({
-    title: "",
-    content: "",
-    trigger: "",
-    category: "",
-    description: "",
-  });
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const form = useForm<InsertSnippet>({
+    resolver: zodResolver(insertSnippetSchema),
+    defaultValues: {
+      title: "",
+      content: "",
+      trigger: "",
+      category: "General",
+      description: "",
+    },
+  });
+
+  // Reset form when opening/closing or editing different snippet
+  useEffect(() => {
+    if (isOpen) {
+      if (editingSnippet) {
+        form.reset({
+          title: editingSnippet.title,
+          content: editingSnippet.content,
+          trigger: editingSnippet.trigger,
+          category: editingSnippet.category || "General",
+          description: editingSnippet.description || "",
+        });
+      } else {
+        form.reset({
+          title: "",
+          content: "",
+          trigger: "",
+          category: "General",
+          description: "",
+        });
+      }
+    }
+  }, [isOpen, editingSnippet, form]);
 
   const createMutation = useMutation({
-    mutationFn: (data: any) => apiRequest("POST", "/api/snippets", data),
+    mutationFn: async (data: InsertSnippet) => {
+      return await apiRequest("/api/snippets", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
       toast({
-        title: "Snippet created",
-        description: "Your snippet has been saved successfully.",
+        title: "Success",
+        description: "Snippet created successfully",
       });
       onClose();
-      resetForm();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to create snippet.",
+        description: error.message || "Failed to create snippet",
         variant: "destructive",
       });
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => 
-      apiRequest("PUT", `/api/snippets/${id}`, data),
+    mutationFn: async (data: InsertSnippet) => {
+      return await apiRequest(`/api/snippets/${editingSnippet!.id}`, {
+        method: "PUT",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
       toast({
-        title: "Snippet updated",
-        description: "Your snippet has been updated successfully.",
+        title: "Success",
+        description: "Snippet updated successfully",
       });
       onClose();
-      resetForm();
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to update snippet.",
+        description: error.message || "Failed to update snippet",
         variant: "destructive",
       });
     },
   });
 
-  useEffect(() => {
-    if (editingSnippet) {
-      setFormData({
-        title: editingSnippet.title,
-        content: editingSnippet.content,
-        trigger: editingSnippet.trigger,
-        category: editingSnippet.category || "",
-        description: editingSnippet.description || "",
-      });
-    } else {
-      resetForm();
-    }
-    setErrors({});
-  }, [editingSnippet, isOpen]);
-
-  const resetForm = () => {
-    setFormData({
-      title: "",
-      content: "",
-      trigger: "",
-      category: "",
-      description: "",
-    });
-    setErrors({});
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: "" }));
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const onSubmit = async (data: InsertSnippet) => {
+    setIsSaving(true);
     try {
-      const validatedData = formSchema.parse(formData);
-      
       if (editingSnippet) {
-        updateMutation.mutate({ id: editingSnippet.id, data: validatedData });
+        await updateMutation.mutateAsync(data);
       } else {
-        createMutation.mutate(validatedData);
+        await createMutation.mutateAsync(data);
       }
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        const fieldErrors: Record<string, string> = {};
-        error.errors.forEach(err => {
-          if (err.path[0]) {
-            fieldErrors[err.path[0] as string] = err.message;
-          }
-        });
-        setErrors(fieldErrors);
-      }
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
+  const handleClose = () => {
+    form.reset();
+    onClose();
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <PlusCircle className="h-5 w-5 text-blue-600" />
-            {editingSnippet ? "Edit Code Snippet" : "New Code Snippet"}
-          </DialogTitle>
-        </DialogHeader>
+    <PopupOverlay 
+      isOpen={isOpen} 
+      onClose={handleClose} 
+      title={editingSnippet ? "Edit Snippet" : "Create New Snippet"}
+      icon={<Plus className="h-5 w-5 text-primary" />}
+    >
+      <div className="flex flex-col h-full">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col h-full">
+            {/* Form Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+              <div className="grid grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="title"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Title</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Enter snippet title" 
+                          className="rounded-xl"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                type="text"
-                placeholder="e.g., React useEffect Hook"
-                value={formData.title}
-                onChange={(e) => handleInputChange("title", e.target.value)}
-                className={errors.title ? "border-red-500" : ""}
+                <FormField
+                  control={form.control}
+                  name="trigger"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Trigger</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="e.g., useeffect, cl, arrow" 
+                          className="rounded-xl font-mono"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="JavaScript">JavaScript</SelectItem>
+                          <SelectItem value="React">React</SelectItem>
+                          <SelectItem value="HTML">HTML</SelectItem>
+                          <SelectItem value="CSS">CSS</SelectItem>
+                          <SelectItem value="Python">Python</SelectItem>
+                          <SelectItem value="General">General</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description (Optional)</FormLabel>
+                      <FormControl>
+                        <Input 
+                          placeholder="Brief description of the snippet" 
+                          className="rounded-xl"
+                          {...field} 
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="content"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Content</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Enter your snippet content here..."
+                        className="min-h-[200px] rounded-xl font-mono text-sm resize-none"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-              {errors.title && <p className="text-red-500 text-sm mt-1">{errors.title}</p>}
             </div>
-            <div>
-              <Label htmlFor="trigger">Trigger Shortcut *</Label>
-              <Input
-                id="trigger"
-                type="text"
-                placeholder="e.g., useef"
-                value={formData.trigger}
-                onChange={(e) => handleInputChange("trigger", e.target.value)}
-                className={`font-mono text-sm ${errors.trigger ? "border-red-500" : ""}`}
-              />
-              {errors.trigger && <p className="text-red-500 text-sm mt-1">{errors.trigger}</p>}
+
+            {/* Footer */}
+            <div className="flex items-center justify-between pt-6 border-t border-gray-100 bg-gray-50 px-6 py-5">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={handleClose}
+                className="flex items-center gap-2 text-sm font-medium hover:bg-white rounded-xl px-4 py-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={isSaving}
+                className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white rounded-xl px-6 py-2"
+              >
+                <Save className="h-4 w-4" />
+                {isSaving ? "Saving..." : editingSnippet ? "Update Snippet" : "Create Snippet"}
+              </Button>
             </div>
-          </div>
-
-          <div>
-            <Label htmlFor="category">Category</Label>
-            <Select value={formData.category} onValueChange={(value) => handleInputChange("category", value)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">No category</SelectItem>
-                <SelectItem value="javascript">JavaScript</SelectItem>
-                <SelectItem value="react">React</SelectItem>
-                <SelectItem value="css">CSS</SelectItem>
-                <SelectItem value="html">HTML</SelectItem>
-                <SelectItem value="python">Python</SelectItem>
-                <SelectItem value="template">Template</SelectItem>
-                <SelectItem value="debug">Debug</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="content">Content *</Label>
-            <Textarea
-              id="content"
-              rows={12}
-              placeholder="Enter your code snippet or text here..."
-              value={formData.content}
-              onChange={(e) => handleInputChange("content", e.target.value)}
-              className={`font-mono text-sm resize-none ${errors.content ? "border-red-500" : ""}`}
-            />
-            {errors.content && <p className="text-red-500 text-sm mt-1">{errors.content}</p>}
-          </div>
-
-          <div>
-            <Label htmlFor="description">Description (Optional)</Label>
-            <Input
-              id="description"
-              type="text"
-              placeholder="Brief description of what this snippet does"
-              value={formData.description}
-              onChange={(e) => handleInputChange("description", e.target.value)}
-            />
-          </div>
-        </form>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200 bg-gray-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            disabled={isPending}
-          >
-            Cancel
-          </Button>
-          <div className="flex gap-3">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => {
-                // Preview functionality could be added here
-                toast({
-                  title: "Preview",
-                  description: "Preview functionality coming soon!",
-                });
-              }}
-              disabled={isPending}
-            >
-              Preview
-            </Button>
-            <Button
-              type="submit"
-              onClick={handleSubmit}
-              disabled={isPending}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {editingSnippet ? "Update" : "Save"} Snippet
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+          </form>
+        </Form>
+      </div>
+    </PopupOverlay>
   );
 }
