@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ClipboardList, Search, Copy, Trash2, TrashIcon, Code, Link, Type } from "lucide-react";
+import { PopupOverlay } from "@/components/popup-overlay";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
@@ -147,19 +147,16 @@ export default function ClipboardHistory({ isOpen, onClose }: ClipboardHistoryPr
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col bg-white rounded-2xl shadow-2xl border-0" onKeyDown={handleKeyDown}>
-        <DialogHeader className="pb-6">
-          <DialogTitle className="flex items-center gap-3 text-xl font-bold">
-            <div className="p-2 bg-blue-50 rounded-xl">
-              <ClipboardList className="h-5 w-5 text-primary" />
-            </div>
-            Clipboard History
-          </DialogTitle>
-        </DialogHeader>
+    <PopupOverlay 
+      isOpen={isOpen} 
+      onClose={onClose} 
+      title="Clipboard History"
+      icon={<ClipboardList className="h-5 w-5 text-primary" />}
+    >
+      <div className="flex flex-col h-full" onKeyDown={handleKeyDown}>
 
         {/* Search Bar */}
-        <div className="border-b border-gray-100 pb-6">
+        <div className="border-b border-gray-100 pb-6 px-6">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
@@ -182,7 +179,7 @@ export default function ClipboardHistory({ isOpen, onClose }: ClipboardHistoryPr
         </div>
 
         {/* Clipboard List */}
-        <div className="flex-1 overflow-y-auto space-y-2">
+        <div className="flex-1 overflow-y-auto space-y-2 px-6">
           {isLoading ? (
             <div className="text-center py-8 text-gray-500">Loading clipboard history...</div>
           ) : filteredItems.length === 0 ? (
@@ -257,7 +254,7 @@ export default function ClipboardHistory({ isOpen, onClose }: ClipboardHistoryPr
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-6 border-t border-gray-100 bg-gray-50 -mx-6 -mb-6 px-6 py-5 rounded-b-2xl">
+        <div className="flex items-center justify-between pt-6 border-t border-gray-100 bg-gray-50 px-6 py-5 rounded-b-2xl">
           <Button
             variant="ghost"
             onClick={() => clearHistoryMutation.mutate()}
@@ -272,7 +269,7 @@ export default function ClipboardHistory({ isOpen, onClose }: ClipboardHistoryPr
             <span>to close</span>
           </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </PopupOverlay>
   );
 }

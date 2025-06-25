@@ -157,8 +157,10 @@ RESTful endpoints for all major operations:
 
 ## Changelog
 
-- June 25, 2025. Initial setup
+- June 25, 2025. Initial setup - Created full-stack SnipClip application with snippet and clipboard management
+- June 25, 2025. Updated design to match Coinbase aesthetic - Applied blue color scheme, rounded corners, modern typography, and full-screen popup overlays
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+Design preferences: Clean, modern interface with Coinbase-style blue accents and professional typography.
