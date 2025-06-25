@@ -119,7 +119,11 @@
 
   /* Selection highlight */
   ::selection {
-    @apply bg-primary/20;
+    @apply bg-blue-100;
+  }
+  
+  .dark ::selection {
+    @apply bg-blue-900;
   }
 
   /* Improved focus visibility */

@@ -101,6 +101,8 @@ Best regards,
       this.snippets.set(id, {
         ...snippet,
         id,
+        category: snippet.category || null,
+        description: snippet.description || null,
         createdAt: now,
         updatedAt: now,
       });
@@ -129,6 +131,8 @@ Best regards,
     const snippet: Snippet = {
       ...insertSnippet,
       id,
+      category: insertSnippet.category || null,
+      description: insertSnippet.description || null,
       createdAt: now,
       updatedAt: now,
     };
@@ -164,6 +168,7 @@ Best regards,
     const item: ClipboardItem = {
       ...insertItem,
       id,
+      type: insertItem.type || "text",
       createdAt: new Date(),
     };
     this.clipboardItems.set(id, item);
