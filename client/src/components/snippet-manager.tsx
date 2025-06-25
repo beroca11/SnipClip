@@ -126,28 +126,30 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col" onKeyDown={handleKeyDown}>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <Code className="h-5 w-5 text-blue-600" />
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col bg-white rounded-2xl shadow-2xl border-0" onKeyDown={handleKeyDown}>
+        <DialogHeader className="pb-6">
+          <DialogTitle className="flex items-center gap-3 text-xl font-bold">
+            <div className="p-2 bg-blue-50 rounded-xl">
+              <Code className="h-5 w-5 text-primary" />
+            </div>
             Code Snippets
           </DialogTitle>
         </DialogHeader>
 
         {/* Search Bar */}
-        <div className="border-b border-gray-200 pb-4">
+        <div className="border-b border-gray-100 pb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
             <Input
               ref={searchInputRef}
               type="text"
               placeholder="Search snippets..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-12 py-3 text-base rounded-xl border-gray-200 focus:border-primary focus:ring-primary"
             />
           </div>
-          <div className="flex items-center justify-between mt-3 text-xs text-gray-500">
+          <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
             <span>{filteredSnippets.length} snippets found</span>
             <div className="flex gap-2">
               <span>Use ↑↓ to navigate</span>
@@ -169,10 +171,10 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
             filteredSnippets.map((snippet, index) => (
               <div
                 key={snippet.id}
-                className={`p-3 rounded-lg cursor-pointer border-l-4 transition-all group ${
+                className={`p-4 rounded-xl cursor-pointer border transition-all group ${
                   index === selectedIndex
-                    ? "bg-blue-50 border-blue-500"
-                    : "border-transparent hover:bg-gray-50 hover:border-blue-500"
+                    ? "bg-blue-50 border-primary shadow-sm"
+                    : "border-gray-100 hover:bg-gray-50 hover:border-primary hover:shadow-sm"
                 }`}
                 onClick={() => handleSelectSnippet(snippet)}
               >
@@ -228,17 +230,17 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-200 bg-gray-50 -mx-6 -mb-6 px-6 py-4 rounded-b-lg">
+        <div className="flex items-center justify-between pt-6 border-t border-gray-100 bg-gray-50 -mx-6 -mb-6 px-6 py-5 rounded-b-2xl">
           <Button
             variant="ghost"
             onClick={onNewSnippet}
-            className="flex items-center gap-2 text-sm"
+            className="flex items-center gap-2 text-sm font-medium hover:bg-white rounded-xl px-4 py-2"
           >
             <Plus className="h-4 w-4" />
             New Snippet
           </Button>
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <kbd className="px-2 py-1 bg-white border border-gray-300 rounded font-mono">Esc</kbd>
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <kbd className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg font-mono text-xs">Esc</kbd>
             <span>to close</span>
           </div>
         </div>

@@ -74,61 +74,68 @@ export default function Dashboard() {
   const recentActivity = getRecentActivity();
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      <div className="p-8 max-w-4xl mx-auto">
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
+    <div className="min-h-screen bg-white">
+      <div className="p-8 max-w-5xl mx-auto">
+        <Card className="mb-8 border-0 shadow-lg rounded-xl">
+          <CardContent className="p-8">
+            <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-2xl font-semibold text-gray-900">SnipClip</h1>
-                <p className="text-sm text-gray-600 mt-1">Snippet & Clipboard Manager</p>
+                <h1 className="text-3xl font-bold text-gray-900">SnipClip</h1>
+                <p className="text-lg text-gray-600 mt-2">The future of productivity is here</p>
+                <p className="text-sm text-gray-500 mt-1">We're the most trusted place for managing your snippets and clipboard</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <Button 
                   onClick={() => setSnippetModalOpen(true)}
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium bg-primary hover:bg-primary/90 text-white rounded-xl shadow-sm"
                 >
                   <Code className="h-4 w-4" />
                   <span>Snippets</span>
-                  <span className="text-xs bg-blue-800 px-2 py-1 rounded">Ctrl+;</span>
+                  <span className="text-xs bg-blue-700 px-2 py-1 rounded-lg">Ctrl+;</span>
                 </Button>
                 <Button 
                   onClick={() => setClipboardModalOpen(true)}
-                  className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700"
+                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium bg-primary hover:bg-primary/90 text-white rounded-xl shadow-sm"
                 >
                   <ClipboardList className="h-4 w-4" />
                   <span>Clipboard</span>
-                  <span className="text-xs bg-emerald-800 px-2 py-1 rounded">Ctrl+Shift+V</span>
+                  <span className="text-xs bg-blue-700 px-2 py-1 rounded-lg">Ctrl+Shift+V</span>
                 </Button>
               </div>
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+              <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center">
-                  <Code className="text-blue-600 h-5 w-5 mr-3" />
+                  <div className="p-3 bg-blue-50 rounded-xl mr-4">
+                    <Code className="text-primary h-6 w-6" />
+                  </div>
                   <div>
-                    <p className="text-sm text-blue-600 font-medium">Total Snippets</p>
-                    <p className="text-2xl font-semibold text-blue-900">{snippets.length}</p>
+                    <p className="text-sm text-gray-600 font-medium">Total Snippets</p>
+                    <p className="text-3xl font-bold text-gray-900">{snippets.length}</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+              <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center">
-                  <ClipboardList className="text-emerald-600 h-5 w-5 mr-3" />
+                  <div className="p-3 bg-blue-50 rounded-xl mr-4">
+                    <ClipboardList className="text-primary h-6 w-6" />
+                  </div>
                   <div>
-                    <p className="text-sm text-emerald-600 font-medium">Clipboard Items</p>
-                    <p className="text-2xl font-semibold text-emerald-900">{clipboardItems.length}</p>
+                    <p className="text-sm text-gray-600 font-medium">Clipboard Items</p>
+                    <p className="text-3xl font-bold text-gray-900">{clipboardItems.length}</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <div className="bg-white border border-gray-100 rounded-xl p-6 shadow-sm hover:shadow-md transition-shadow">
                 <div className="flex items-center">
-                  <Keyboard className="text-purple-600 h-5 w-5 mr-3" />
+                  <div className="p-3 bg-blue-50 rounded-xl mr-4">
+                    <Keyboard className="text-primary h-6 w-6" />
+                  </div>
                   <div>
-                    <p className="text-sm text-purple-600 font-medium">Active Shortcuts</p>
-                    <p className="text-2xl font-semibold text-purple-900">{snippets.length}</p>
+                    <p className="text-sm text-gray-600 font-medium">Active Shortcuts</p>
+                    <p className="text-3xl font-bold text-gray-900">{snippets.length}</p>
                   </div>
                 </div>
               </div>
