@@ -13,47 +13,47 @@ export function useKeyboardShortcuts({ onSnippetsOpen, onClipboardOpen }: Keyboa
   });
 
   useEffect(() => {
+    const parseShortcut = (shortcut: string) => {
+      const parts = shortcut.toLowerCase().split('+');
+      const modifiers = parts.slice(0, -1);
+      const key = parts[parts.length - 1];
+      return { modifiers, key };
+    };
+
+    const checkShortcut = (e: KeyboardEvent, shortcut: string) => {
+      const { modifiers, key } = parseShortcut(shortcut);
+      
+      const pressedModifiers: string[] = [];
+      if (e.ctrlKey || e.metaKey) pressedModifiers.push('ctrl');
+      if (e.altKey) pressedModifiers.push('alt');
+      if (e.shiftKey) pressedModifiers.push('shift');
+      
+      const pressedKey = e.key.toLowerCase();
+      
+      return (
+        modifiers.length === pressedModifiers.length &&
+        modifiers.every(mod => pressedModifiers.includes(mod)) &&
+        key === pressedKey
+      );
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Parse shortcut format like "ctrl+;" or "ctrl+shift+v"
-      const parseShortcut = (shortcut: string) => {
-        const parts = shortcut.toLowerCase().split('+');
-        return {
-          ctrl: parts.includes('ctrl'),
-          shift: parts.includes('shift'),
-          alt: parts.includes('alt'),
-          key: parts[parts.length - 1],
-        };
-      };
+      if (!settings) return;
 
-      const snippetShortcut = parseShortcut(settings?.snippetShortcut || "ctrl+;");
-      const clipboardShortcut = parseShortcut(settings?.clipboardShortcut || "ctrl+shift+v");
-
-      // Check if current key combination matches snippet shortcut
-      if (
-        e.ctrlKey === snippetShortcut.ctrl &&
-        e.shiftKey === snippetShortcut.shift &&
-        e.altKey === snippetShortcut.alt &&
-        e.key.toLowerCase() === snippetShortcut.key
-      ) {
+      // Check snippet shortcut
+      if (checkShortcut(e, settings.snippetShortcut)) {
         e.preventDefault();
         onSnippetsOpen();
-        return;
       }
-
-      // Check if current key combination matches clipboard shortcut
-      if (
-        e.ctrlKey === clipboardShortcut.ctrl &&
-        e.shiftKey === clipboardShortcut.shift &&
-        e.altKey === clipboardShortcut.alt &&
-        e.key.toLowerCase() === clipboardShortcut.key
-      ) {
+      
+      // Check clipboard shortcut
+      if (checkShortcut(e, settings.clipboardShortcut)) {
         e.preventDefault();
         onClipboardOpen();
-        return;
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [settings, onSnippetsOpen, onClipboardOpen]);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onSnippetsOpen, onClipboardOpen, settings]);
 }

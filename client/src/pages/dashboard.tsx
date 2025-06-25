@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Code, ClipboardList, Keyboard } from "lucide-react";
+import { Code, ClipboardList, Keyboard, Settings } from "lucide-react";
 import SnippetManager from "@/components/snippet-manager";
 import ClipboardHistory from "@/components/clipboard-history";
 import SnippetEditor from "@/components/snippet-editor";

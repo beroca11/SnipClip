@@ -159,6 +159,9 @@ RESTful endpoints for all major operations:
 
 - June 25, 2025. Initial setup - Created full-stack SnipClip application with snippet and clipboard management
 - June 25, 2025. Updated design to match Coinbase aesthetic - Applied blue color scheme, rounded corners, modern typography, and full-screen popup overlays
+- June 25, 2025. Database migration completed - Moved from memory storage to PostgreSQL for multi-user support
+- June 25, 2025. Enhanced keyboard shortcuts - Added customizable keyboard shortcuts with user preference settings
+- June 25, 2025. Fixed snippet functionality - Resolved database connection and added default snippets
 
 ## User Preferences
 
