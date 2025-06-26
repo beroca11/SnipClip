@@ -40,15 +40,15 @@ export function PopupOverlay({ isOpen, onClose, children, title, icon }: PopupOv
       >
         <div className="flex flex-col h-full max-h-[85vh]">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-100">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+            <div className="flex items-center gap-2">
               {icon && (
-                <div className="p-2 bg-blue-50 rounded-xl">
+                <div className="p-1.5 bg-blue-50 rounded-lg">
                   {icon}
                 </div>
               )}
               <h2 
-                className="text-[18px] font-semibold text-gray-900"
+                className="text-[16px] font-semibold text-gray-900"
                 style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
               >
                 {title}
@@ -58,7 +58,7 @@ export function PopupOverlay({ isOpen, onClose, children, title, icon }: PopupOv
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 rounded-lg hover:bg-gray-100"
+              className="h-7 w-7 p-0 rounded-md hover:bg-gray-100"
             >
               <X className="h-4 w-4" />
             </Button>

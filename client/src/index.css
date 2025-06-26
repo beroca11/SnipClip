@@ -20,8 +20,8 @@
 
 .popup-content {
   background: white;
-  border-radius: 1.5rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border-radius: 12px;
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
   max-height: 85vh;
   overflow: hidden;
   animation: popup-enter 0.2s ease-out;
@@ -137,7 +137,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.6);
     backdrop-filter: blur(8px);
     z-index: 9999;
     display: flex;
@@ -147,8 +147,8 @@
 
   .popup-content {
     background: white;
-    border-radius: 16px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border-radius: 12px;
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
     max-width: 90vw;
     max-height: 85vh;
     overflow: hidden;
@@ -193,25 +193,25 @@
   }
 
   .clipboard-scrollbar::-webkit-scrollbar-track {
-    background: #1f2937; /* gray-800 */
+    background: rgba(30, 41, 59, 0.5); /* slate-800 with opacity */
     border-radius: 4px;
   }
 
   .clipboard-scrollbar::-webkit-scrollbar-thumb {
-    background: #3b82f6; /* blue-500 - bright blue */
+    background: linear-gradient(180deg, #3b82f6, #8b5cf6); /* blue to purple gradient */
     border-radius: 4px;
-    box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); /* blue glow */
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.3); /* blue glow */
   }
 
   .clipboard-scrollbar::-webkit-scrollbar-thumb:hover {
-    background: #2563eb; /* blue-600 - darker on hover */
-    box-shadow: 0 0 8px rgba(59, 130, 246, 0.7); /* stronger glow on hover */
+    background: linear-gradient(180deg, #2563eb, #7c3aed); /* darker gradient on hover */
+    box-shadow: 0 0 12px rgba(59, 130, 246, 0.5); /* stronger glow on hover */
   }
 
   /* Firefox scrollbar for clipboard history */
   .clipboard-scrollbar {
     scrollbar-width: thin;
-    scrollbar-color: #3b82f6 #1f2937; /* blue-500 thumb, gray-800 track */
+    scrollbar-color: #3b82f6 rgba(30, 41, 59, 0.5); /* blue thumb, slate-800 track */
   }
 
   /* Improved focus visibility */
@@ -220,5 +220,49 @@
   textarea:focus-visible,
   select:focus-visible {
     @apply outline-none ring-2 ring-primary ring-offset-2;
+  }
+
+  /* Global overlay system */
+  .overlay-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .overlay-content {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.3);
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow: hidden;
+  }
+
+  .overlay-content-dark {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+    max-width: 90vw;
+    max-height: 85vh;
+    overflow: hidden;
+  }
+
+  .overlay-content-compact {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 8px;
+    box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.5);
+    max-width: 28rem;
+    min-height: 400px;
+    overflow: hidden;
   }
 }

@@ -235,9 +235,9 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="overlay-backdrop">
       <div
-        className="w-full max-w-2xl mx-auto rounded-2xl shadow-2xl bg-gradient-to-br from-gray-900/95 to-gray-800/95 border border-gray-700 overflow-hidden"
+        className="overlay-content-dark max-w-2xl mx-4"
         style={{ minHeight: 500 }}
         tabIndex={-1}
         onKeyDown={handleKeyDown}

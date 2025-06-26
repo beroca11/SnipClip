@@ -10,6 +10,7 @@ import {
   createSession, 
   getSession,
   removeSession,
+  authenticateUser,
   type UserCredentials 
 } from "./auth";
 
@@ -19,6 +20,15 @@ interface AuthenticatedRequest extends Request {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Health check endpoint (no authentication required)
+  app.get("/api/health", (req, res) => {
+    res.json({ 
+      status: "ok", 
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development'
+    });
+  });
+
   // Authentication routes
   app.post("/api/auth/login", async (req, res) => {
     try {
@@ -91,22 +101,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Development mode authentication bypass
+  if (process.env.NODE_ENV === 'development') {
+    app.post("/api/auth/dev-login", async (req, res) => {
+      try {
+        const { pin, passphrase } = req.body as UserCredentials;
+        
+        if (!pin || !passphrase) {
+          return res.status(400).json({ message: "PIN and passphrase are required" });
+        }
+        
+        // Generate consistent user ID
+        const userId = generateUserId(pin, passphrase);
+        
+        // Create session
+        const sessionToken = createSession(userId, pin, passphrase);
+        
+        res.json({
+          success: true,
+          userId,
+          sessionToken,
+          message: "Development login successful"
+        });
+      } catch (error) {
+        res.status(500).json({ message: "Development login failed" });
+      }
+    });
+  }
+
   // Middleware to extract user ID from session
-  const authenticateUser = (req: AuthenticatedRequest, res: any, next: any) => {
+  const authenticateUserMiddleware = (req: AuthenticatedRequest, res: any, next: any) => {
     const sessionToken = req.headers["x-session-token"] as string;
     const userId = req.headers["x-user-id"] as string;
     
-    if (sessionToken) {
-      const session = getSession(sessionToken);
-      if (session) {
-        req.userId = session.userId;
-        return next();
-      }
-    }
+    const authenticatedUserId = authenticateUser(sessionToken, userId);
     
-    if (userId) {
-      // Fallback for backward compatibility
-      req.userId = userId;
+    if (authenticatedUserId) {
+      req.userId = authenticatedUserId;
       return next();
     }
     
@@ -114,7 +145,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   // Snippets routes
-  app.get("/api/snippets", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/snippets", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       const snippets = await storage.getSnippets(userId);
@@ -124,7 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/snippets", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/snippets", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       const data = insertSnippetSchema.parse(req.body);
@@ -142,7 +173,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/snippets/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/snippets/:id", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       const id = parseInt(req.params.id);
@@ -166,7 +197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/snippets/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/snippets/:id", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       const id = parseInt(req.params.id);
@@ -181,7 +212,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Clipboard routes
-  app.get("/api/clipboard", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/clipboard", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       const items = await storage.getClipboardItems(userId);
@@ -191,7 +222,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clipboard", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.post("/api/clipboard", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       const data = insertClipboardItemSchema.parse(req.body);
@@ -205,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/clipboard/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/clipboard/:id", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       const id = parseInt(req.params.id);
@@ -219,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/clipboard", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.delete("/api/clipboard", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     const userId = req.userId!;
     try {
       await storage.clearClipboardHistory(userId);
@@ -230,7 +261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settings routes
-  app.get("/api/settings", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/settings", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       const settings = await storage.getSettings();
       res.json(settings);
@@ -239,7 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/settings", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  app.put("/api/settings", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
       console.log("PUT /api/settings - Request body:", req.body);
       const data = insertSettingsSchema.partial().parse(req.body);

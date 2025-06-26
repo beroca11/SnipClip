@@ -31,6 +31,22 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  // Handle authentication errors gracefully
+  if (res.status === 401) {
+    // Clear invalid credentials
+    localStorage.removeItem("sessionToken");
+    localStorage.removeItem("userKey");
+    
+    // If this is a login request, don't throw
+    if (url.includes("/api/auth/login")) {
+      return res;
+    }
+    
+    // For other requests, redirect to login or show login modal
+    window.location.reload();
+    throw new Error("Authentication required");
+  }
+
   await throwIfResNotOk(res);
   return res;
 }
@@ -58,8 +74,18 @@ export const getQueryFn: <T>(options: {
       headers,
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-      return null;
+    if (res.status === 401) {
+      // Clear invalid credentials
+      localStorage.removeItem("sessionToken");
+      localStorage.removeItem("userKey");
+      
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
+      
+      // For throw behavior, reload the page to show login
+      window.location.reload();
+      throw new Error("Authentication required");
     }
 
     await throwIfResNotOk(res);

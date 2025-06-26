@@ -214,7 +214,7 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="overlay-backdrop"
       onClick={(e) => {
         // Close when clicking on the backdrop
         if (e.target === e.currentTarget) {
@@ -223,38 +223,66 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
       }}
     >
       <div
-        className="w-full max-w-xl mx-auto rounded-2xl shadow-2xl bg-gradient-to-br from-gray-900/95 to-gray-800/95 border border-gray-700 overflow-hidden"
-        style={{ minHeight: 420 }}
+        className="w-full max-w-3xl mx-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 shadow-2xl overflow-hidden backdrop-blur-xl"
+        style={{ minHeight: 600 }}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
         onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the content
       >
+        {/* Header with gradient */}
+        <div className="bg-gradient-to-r from-emerald-600/20 via-blue-600/20 to-purple-600/20 border-b border-slate-700/50">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-500/20 rounded-xl backdrop-blur-sm">
+                <Code className="h-5 w-5 text-emerald-400" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Snippet Manager</h2>
+                <p className="text-sm text-slate-400">Organize and access your code snippets</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-md font-mono">
+                {totalSnippets} snippets
+              </span>
+            </div>
+          </div>
+        </div>
+
         {/* Search Bar */}
-        <div className="flex items-center px-6 pt-6 pb-2 bg-transparent">
-          <Search className="h-5 w-5 text-gray-400 absolute ml-3" />
-          <Input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Type to filter snippets"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-10 py-3 text-[14px] rounded-xl border-0 bg-gray-800 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary focus:outline-none shadow-none font-sans"
-            style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-          />
+        <div className="px-6 pt-4 pb-3 bg-slate-900/50">
+          <div className="relative">
+            <Search className="h-4 w-4 text-slate-400 absolute left-3 top-1/2 transform -translate-y-1/2" />
+            <Input
+              ref={searchInputRef}
+              type="text"
+              placeholder="Search snippets by title, content, or category..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-3 text-sm rounded-xl border-0 bg-slate-800/50 text-white placeholder:text-slate-400 focus:ring-2 focus:ring-emerald-500/50 focus:outline-none backdrop-blur-sm"
+              style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+            />
+          </div>
         </div>
 
         {/* List */}
         <div
-          className={`max-h-96 overflow-y-auto py-1 px-1 ${customScrollbar}`}
+          className={`max-h-96 overflow-y-auto ${customScrollbar} px-2`}
         >
           {isLoading ? (
-            <div className="text-center py-8 text-gray-400 text-[14px] font-sans" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}>Loading snippets...</div>
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-3"></div>
+              <div className="text-slate-400 text-sm">Loading snippets...</div>
+            </div>
           ) : filteredItems.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-[14px] font-sans" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}>
-              {searchTerm ? "No snippets match your search" : "No snippets found"}
+            <div className="text-center py-12">
+              <div className="text-slate-400 text-sm mb-2">
+                {searchTerm ? "No snippets match your search" : "No snippets found"}
+              </div>
+              <div className="text-slate-500 text-xs">Create your first snippet to get started</div>
             </div>
           ) : (
-            <ul ref={listRef}>
+            <ul ref={listRef} className="space-y-1">
               {filteredItems.map((item, index) => {
                 if (item.type === 'category') {
                   const { name, count } = item.data;
@@ -262,22 +290,22 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
                     <li
                       key={`category-${name}`}
                       ref={el => (itemRefs.current[index] = el)}
-                      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg cursor-default transition-all select-none ${
+                      className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-default transition-all duration-200 ${
                         index === selectedIndex
-                          ? "bg-blue-600/90 text-white shadow-lg"
-                          : "text-gray-300"
+                          ? "bg-gradient-to-r from-slate-700/50 to-slate-600/50 border border-slate-600/50 shadow-lg"
+                          : "text-slate-300"
                       }`}
                       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                     >
-                      <span className="flex items-center justify-center h-7 w-7 rounded-lg bg-gray-700/80">
-                        <Folder className="h-4 w-4" />
-                      </span>
+                      <div className="flex-shrink-0 w-8 h-8 bg-slate-700/50 rounded-lg flex items-center justify-center">
+                        <Folder className="h-4 w-4 text-slate-400" />
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="truncate font-medium text-[14px] leading-4">
+                        <div className="truncate font-semibold text-white text-sm leading-5">
                           {name}
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] text-gray-400">
-                          <span>{count} snippet{count !== 1 ? 's' : ''}</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs text-slate-400">{count} snippet{count !== 1 ? 's' : ''}</span>
                         </div>
                       </div>
                     </li>
@@ -290,36 +318,39 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
                     <li
                       key={snippet.id}
                       ref={el => (itemRefs.current[index] = el)}
-                      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg cursor-pointer transition-all select-none ${
+                      className={`group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 ${
                         index === selectedIndex
-                          ? "bg-blue-600/90 text-white shadow-lg"
-                          : "hover:bg-gray-700/60 text-white"
+                          ? "bg-gradient-to-r from-emerald-600/20 to-blue-600/20 border border-emerald-500/30 shadow-lg"
+                          : "hover:bg-slate-800/50 border border-transparent"
                       }`}
                       onClick={() => handleSelectSnippet(snippet)}
                       onMouseEnter={() => setSelectedIndex(index)}
                       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                     >
-                      <span className={`flex items-center justify-center h-7 w-7 rounded-lg ${contentType} bg-opacity-90`}>
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${contentType} bg-opacity-90`}>
                         <Icon className="h-4 w-4" />
-                      </span>
+                      </div>
                       <div className="flex-1 min-w-0">
-                        <div className="truncate font-medium text-[14px] leading-4">
+                        <div className="truncate font-medium text-white text-sm leading-5">
                           {snippet.title}
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] text-gray-300">
-                          <Badge variant="secondary" className="bg-gray-700/80 text-gray-200 px-1.5 py-0.5 rounded-md font-medium">
+                        <div className="flex items-center gap-2 mt-1">
+                          <Badge variant="secondary" className="bg-slate-700/50 text-slate-200 px-2 py-0.5 rounded-md font-medium text-xs">
                             {snippet.category || "General"}
                           </Badge>
-                          {snippet.trigger && snippet.trigger.includes('-') ? (
-                            <span className="font-mono text-emerald-400">
-                              {snippet.trigger.split('-')[0]}
-                            </span>
-                          ) : (
-                            <span className="font-mono">{snippet.trigger}</span>
+                          {snippet.trigger && (
+                            <>
+                              <span className="text-xs text-slate-500">•</span>
+                              <span className="text-xs font-mono text-emerald-400">
+                                {snippet.trigger.includes('-') ? snippet.trigger.split('-')[0] : snippet.trigger}
+                              </span>
+                            </>
                           )}
+                          <span className="text-xs text-slate-500">•</span>
+                          <span className="text-xs text-slate-500 font-mono">⌘{index + 2}</span>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end gap-0.5 ml-2">
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button
                           size="icon"
                           variant="ghost"
@@ -327,10 +358,10 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
                             e.stopPropagation();
                             handleSelectSnippet(snippet);
                           }}
-                          className="h-6 w-6 p-0 text-emerald-400 hover:text-emerald-300"
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/20 rounded-lg"
                           tabIndex={-1}
                         >
-                          <Copy className="h-3.5 w-3.5" />
+                          <Copy className="h-4 w-4" />
                         </Button>
                         <Button
                           size="icon"
@@ -339,22 +370,21 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
                             e.stopPropagation();
                             onEditSnippet(snippet);
                           }}
-                          className="h-6 w-6 p-0 text-blue-400 hover:text-blue-300"
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-blue-400 hover:bg-blue-500/20 rounded-lg"
                           tabIndex={-1}
                         >
-                          <Edit className="h-3.5 w-3.5" />
+                          <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={e => handleDeleteSnippet(e, snippet.id)}
-                          className="h-6 w-6 p-0 text-red-400 hover:text-red-300"
+                          className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg"
                           disabled={deleteSnippetMutation.isPending}
                           tabIndex={-1}
                         >
-                          <Trash2 className="h-3.5 w-3.5" />
+                          <Trash2 className="h-4 w-4" />
                         </Button>
-                        <span className="text-[10px] text-gray-400 font-mono">⌘{index + 2}</span>
                       </div>
                     </li>
                   );
@@ -365,23 +395,24 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3 border-t border-gray-700 bg-gray-900/80">
-          <div className="flex items-center gap-2">
+        <div className="px-6 py-4 bg-gradient-to-r from-slate-900/50 to-slate-800/50 border-t border-slate-700/50">
+          <div className="flex items-center justify-between">
             <Button
               variant="ghost"
               onClick={onNewSnippet}
-              className="flex items-center gap-2 text-[12px] font-medium text-blue-400 hover:text-blue-300 hover:bg-blue-900/20 rounded-lg px-3 py-1.5"
+              className="flex items-center gap-2 text-sm font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 rounded-lg px-3 py-2"
               style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
             >
-              <Plus className="h-3.5 w-3.5" />
+              <Plus className="h-4 w-4" />
               New Snippet
             </Button>
-          </div>
-          <div className="flex items-center gap-2 text-[12px] text-gray-400" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}>
-            <span>{totalSnippets} snippets</span>
-            <span>•</span>
-            <kbd className="px-2 py-1 bg-gray-800 border border-gray-700 rounded font-mono text-[10px]">Esc</kbd>
-            <span>to close</span>
+            <div className="flex items-center gap-3 text-sm text-slate-500" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}>
+              <span>Use ↑↓ to navigate</span>
+              <span>•</span>
+              <span>Enter to copy</span>
+              <span>•</span>
+              <span>Esc to close</span>
+            </div>
           </div>
         </div>
       </div>

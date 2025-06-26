@@ -72,8 +72,8 @@ export default function LoginModal({ isOpen, onLoginSuccess }: LoginModalProps) 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <Card className="w-full max-w-md">
+    <div className="overlay-backdrop">
+      <Card className="overlay-content max-w-md">
         <CardHeader>
           <CardTitle>Welcome to SnipClip</CardTitle>
           <CardDescription>
