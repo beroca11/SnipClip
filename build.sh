@@ -1,14 +1,29 @@
 #!/bin/bash
 
+set -e  # Exit on any error
+
 echo "Starting build process..."
 
 # Set environment
 export NODE_ENV=production
 echo "NODE_ENV: $NODE_ENV"
 
-# Install dependencies
+# Clear any existing node_modules and package-lock.json to ensure clean install
+echo "Cleaning existing dependencies..."
+rm -rf node_modules package-lock.json
+
+# Install dependencies explicitly
 echo "Installing dependencies..."
-npm install
+npm install --production=false
+
+# Verify vite is installed
+echo "Verifying Vite installation..."
+if ! npx vite --version; then
+    echo "Vite not found after installation!"
+    echo "Installed packages:"
+    npm list vite
+    exit 1
+fi
 
 # Build client
 echo "Building client with Vite..."
