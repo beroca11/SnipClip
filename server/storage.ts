@@ -11,6 +11,8 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gt } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
 
 export interface IStorage {
   // Snippets
@@ -32,6 +34,262 @@ export interface IStorage {
   updateSettings(settings: Partial<InsertSettings>): Promise<Settings>;
 }
 
+// File-based storage for persistence across restarts
+export class FileStorage implements IStorage {
+  private dataDir: string;
+  private snippetsFile: string;
+  private clipboardFile: string;
+  private settingsFile: string;
+  private currentSnippetId: number;
+  private currentClipboardId: number;
+
+  constructor() {
+    this.dataDir = path.resolve(process.cwd(), "data");
+    this.snippetsFile = path.join(this.dataDir, "snippets.json");
+    this.clipboardFile = path.join(this.dataDir, "clipboard.json");
+    this.settingsFile = path.join(this.dataDir, "settings.json");
+    this.currentSnippetId = 1;
+    this.currentClipboardId = 1;
+    
+    // Ensure data directory exists
+    if (!fs.existsSync(this.dataDir)) {
+      fs.mkdirSync(this.dataDir, { recursive: true });
+    }
+    
+    // Initialize files if they don't exist
+    this.initializeFiles();
+  }
+
+  private initializeFiles() {
+    // Initialize snippets file
+    if (!fs.existsSync(this.snippetsFile)) {
+      fs.writeFileSync(this.snippetsFile, JSON.stringify([], null, 2));
+    }
+
+    // Initialize clipboard file
+    if (!fs.existsSync(this.clipboardFile)) {
+      fs.writeFileSync(this.clipboardFile, JSON.stringify([], null, 2));
+    }
+
+    // Initialize settings file
+    if (!fs.existsSync(this.settingsFile)) {
+      const defaultSettings = {
+        id: 1,
+        snippetShortcut: "ctrl+;",
+        clipboardShortcut: "ctrl+shift+v",
+        clipboardEnabled: 1,
+        historyLimit: 100,
+        launchOnStartup: 0,
+        theme: "light"
+      };
+      fs.writeFileSync(this.settingsFile, JSON.stringify(defaultSettings, null, 2));
+    }
+
+    // Calculate next IDs
+    this.calculateNextIds();
+  }
+
+  private calculateNextIds() {
+    try {
+      const snippets = this.readSnippets();
+      const clipboardItems = this.readClipboardItems();
+      
+      this.currentSnippetId = snippets.length > 0 ? Math.max(...snippets.map(s => s.id)) + 1 : 1;
+      this.currentClipboardId = clipboardItems.length > 0 ? Math.max(...clipboardItems.map(c => c.id)) + 1 : 1;
+    } catch (error) {
+      console.log("Error calculating next IDs, using defaults");
+    }
+  }
+
+  private readSnippets(): Snippet[] {
+    try {
+      const data = fs.readFileSync(this.snippetsFile, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  private writeSnippets(snippets: Snippet[]) {
+    fs.writeFileSync(this.snippetsFile, JSON.stringify(snippets, null, 2));
+  }
+
+  private readClipboardItems(): ClipboardItem[] {
+    try {
+      const data = fs.readFileSync(this.clipboardFile, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  private writeClipboardItems(items: ClipboardItem[]) {
+    fs.writeFileSync(this.clipboardFile, JSON.stringify(items, null, 2));
+  }
+
+  private readSettings(): Settings {
+    try {
+      const data = fs.readFileSync(this.settingsFile, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      return {
+        id: 1,
+        snippetShortcut: "ctrl+;",
+        clipboardShortcut: "ctrl+shift+v",
+        clipboardEnabled: 1,
+        historyLimit: 100,
+        launchOnStartup: 0,
+        theme: "light"
+      };
+    }
+  }
+
+  private writeSettings(settings: Settings) {
+    fs.writeFileSync(this.settingsFile, JSON.stringify(settings, null, 2));
+  }
+
+  // Snippets
+  async getSnippets(userId: string): Promise<Snippet[]> {
+    const snippets = this.readSnippets();
+    return snippets
+      .filter(snippet => snippet.userId === userId)
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+  }
+
+  async getSnippet(id: number, userId: string): Promise<Snippet | undefined> {
+    const snippets = this.readSnippets();
+    return snippets.find(snippet => snippet.id === id && snippet.userId === userId);
+  }
+
+  async getSnippetByTrigger(trigger: string, userId: string): Promise<Snippet | undefined> {
+    const snippets = this.readSnippets();
+    return snippets.find(snippet => snippet.trigger === trigger && snippet.userId === userId);
+  }
+
+  async createSnippet(insertSnippet: InsertSnippet, userId: string): Promise<Snippet> {
+    const snippets = this.readSnippets();
+    const now = new Date();
+    const snippet: Snippet = {
+      ...insertSnippet,
+      id: this.currentSnippetId++,
+      userId,
+      category: insertSnippet.category || null,
+      description: insertSnippet.description || null,
+      parentId: insertSnippet.parentId || null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    snippets.push(snippet);
+    this.writeSnippets(snippets);
+    return snippet;
+  }
+
+  async updateSnippet(id: number, updateData: Partial<InsertSnippet>, userId: string): Promise<Snippet | undefined> {
+    const snippets = this.readSnippets();
+    const index = snippets.findIndex(s => s.id === id && s.userId === userId);
+    if (index === -1) return undefined;
+    
+    snippets[index] = {
+      ...snippets[index],
+      ...updateData,
+      updatedAt: new Date(),
+    };
+    
+    this.writeSnippets(snippets);
+    return snippets[index];
+  }
+
+  async deleteSnippet(id: number, userId: string): Promise<boolean> {
+    const snippets = this.readSnippets();
+    const filteredSnippets = snippets.filter(s => !(s.id === id && s.userId === userId));
+    
+    if (filteredSnippets.length === snippets.length) {
+      return false; // No snippet was deleted
+    }
+    
+    this.writeSnippets(filteredSnippets);
+    return true;
+  }
+
+  // Clipboard
+  async getClipboardItems(userId: string): Promise<ClipboardItem[]> {
+    const items = this.readClipboardItems();
+    return items
+      .filter(item => item.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }
+
+  async createClipboardItem(insertItem: InsertClipboardItem, userId: string): Promise<ClipboardItem> {
+    const items = this.readClipboardItems();
+    
+    // Check for recent duplicates (within last 5 seconds)
+    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    const recentItems = items.filter(item => 
+      item.userId === userId &&
+      item.content === insertItem.content &&
+      item.type === (insertItem.type || "text") &&
+      new Date(item.createdAt).getTime() > fiveSecondsAgo.getTime()
+    );
+    
+    if (recentItems.length > 0) {
+      return recentItems[0];
+    }
+    
+    const item: ClipboardItem = {
+      ...insertItem,
+      id: this.currentClipboardId++,
+      userId,
+      type: insertItem.type || "text",
+      createdAt: new Date(),
+    };
+    
+    items.push(item);
+    
+    // Maintain history limit
+    const userItems = items.filter(i => i.userId === userId);
+    if (userItems.length > 100) {
+      const toDelete = userItems.slice(100);
+      const filteredItems = items.filter(i => !toDelete.some(d => d.id === i.id));
+      this.writeClipboardItems(filteredItems);
+    } else {
+      this.writeClipboardItems(items);
+    }
+    
+    return item;
+  }
+
+  async deleteClipboardItem(id: number, userId: string): Promise<boolean> {
+    const items = this.readClipboardItems();
+    const filteredItems = items.filter(item => !(item.id === id && item.userId === userId));
+    
+    if (filteredItems.length === items.length) {
+      return false; // No item was deleted
+    }
+    
+    this.writeClipboardItems(filteredItems);
+    return true;
+  }
+
+  async clearClipboardHistory(userId: string): Promise<void> {
+    const items = this.readClipboardItems();
+    const filteredItems = items.filter(item => item.userId !== userId);
+    this.writeClipboardItems(filteredItems);
+  }
+
+  // Settings
+  async getSettings(): Promise<Settings> {
+    return this.readSettings();
+  }
+
+  async updateSettings(settings: Partial<InsertSettings>): Promise<Settings> {
+    const currentSettings = this.readSettings();
+    const updatedSettings = { ...currentSettings, ...settings };
+    this.writeSettings(updatedSettings);
+    return updatedSettings;
+  }
+}
+
 export class MemStorage implements IStorage {
   private snippets: Map<number, Snippet>;
   private clipboardItems: Map<number, ClipboardItem>;
@@ -44,8 +302,6 @@ export class MemStorage implements IStorage {
     this.clipboardItems = new Map();
     this.currentSnippetId = 1;
     this.currentClipboardId = 1;
-    
-    // Default settings
     this.settings = {
       id: 1,
       snippetShortcut: "ctrl+;",
@@ -53,57 +309,9 @@ export class MemStorage implements IStorage {
       clipboardEnabled: 1,
       historyLimit: 100,
       launchOnStartup: 0,
-      theme: "light",
+      theme: "light"
     };
-
-    // Add some initial snippets for demo
-    this.initializeDefaultSnippets();
-  }
-
-  private initializeDefaultSnippets() {
-    const defaultSnippets: Omit<InsertSnippet, 'userId'>[] = [
-      {
-        title: "React useEffect Hook",
-        content: `useEffect(() => {
-  // Effect logic here
-  return () => {
-    // Cleanup
-  };
-}, [dependency]);`,
-        trigger: "useef",
-        category: "javascript",
-        description: "Basic React useEffect hook with cleanup"
-      },
-      {
-        title: "Console Log Debug",
-        content: "console.log('DEBUG:', variable);",
-        trigger: "clog",
-        category: "debug",
-        description: "Quick console log for debugging"
-      },
-      {
-        title: "Email Template",
-        content: `Subject: Follow-up on our meeting\n\nHi [Name],\n\nThank you for taking the time to meet with me today. I wanted to follow up on our discussion about...\n\nBest regards,\n[Your Name]`,
-        trigger: "email",
-        category: "template",
-        description: "Professional email template"
-      }
-    ];
-    const demoUserId = "demo-user";
-    defaultSnippets.forEach(snippet => {
-      const id = this.currentSnippetId++;
-      const now = new Date();
-      this.snippets.set(id, {
-        ...snippet,
-        id,
-        userId: demoUserId,
-        category: snippet.category || null,
-        description: snippet.description || null,
-        parentId: null,
-        createdAt: now,
-        updatedAt: now,
-      });
-    });
+    // No default snippets - users start with a clean slate
   }
 
   async getSnippets(userId: string): Promise<Snippet[]> {
@@ -340,5 +548,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Use in-memory storage if DATABASE_URL is not available
-export const storage = process.env.DATABASE_URL ? new DatabaseStorage() : new MemStorage();
+// Use database storage if DATABASE_URL is available, otherwise use file storage for persistence
+export const storage = process.env.DATABASE_URL ? new DatabaseStorage() : new FileStorage();
