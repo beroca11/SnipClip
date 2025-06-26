@@ -37,11 +37,13 @@ export const insertSnippetSchema = createInsertSchema(snippets).omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  userId: true,
 });
 
 export const insertClipboardItemSchema = createInsertSchema(clipboardItems).omit({
   id: true,
   createdAt: true,
+  userId: true,
 });
 
 export const insertSettingsSchema = createInsertSchema(settings).omit({
