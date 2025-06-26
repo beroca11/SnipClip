@@ -1,12 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 
 export default defineConfig({
   plugins: [
     react(),
-    runtimeErrorOverlay(),
+    // Only include Replit plugins in Replit environment
+    ...(process.env.REPL_ID !== undefined ? [
+      // Dynamic import to avoid errors in non-Replit environments
+      (await import("@replit/vite-plugin-runtime-error-modal")).default(),
+    ] : []),
     ...(process.env.NODE_ENV !== "production" &&
     process.env.REPL_ID !== undefined
       ? [
