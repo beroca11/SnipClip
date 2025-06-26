@@ -12,9 +12,14 @@ process.env.NODE_ENV = 'production';
 console.log(`NODE_ENV: ${process.env.NODE_ENV}`);
 
 try {
-  // Run the build process
+  // Install dependencies explicitly
+  console.log('Installing dependencies...');
+  execSync('npm install', { stdio: 'inherit' });
+  
+  // Run the build process using npx to ensure we use the installed versions
   console.log('Running build process...');
-  execSync('npm run build', { stdio: 'inherit' });
+  execSync('npx vite build', { stdio: 'inherit' });
+  execSync('npx esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist', { stdio: 'inherit' });
   
   // Check if build files exist
   const distPath = path.resolve(process.cwd(), 'dist', 'public');
