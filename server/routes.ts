@@ -1,14 +1,121 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertSnippetSchema, insertClipboardItemSchema, insertSettingsSchema } from "@shared/schema";
 import { z } from "zod";
+import { 
+  generateUserId, 
+  validatePin, 
+  validatePassphrase, 
+  createSession, 
+  getSession,
+  removeSession,
+  type UserCredentials 
+} from "./auth";
+
+// Extend Request interface to include userId
+interface AuthenticatedRequest extends Request {
+  userId?: string;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Snippets routes
-  app.get("/api/snippets", async (req, res) => {
+  // Authentication routes
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { pin, passphrase } = req.body as UserCredentials;
+      
+      // Validate input
+      if (!pin || !passphrase) {
+        return res.status(400).json({ message: "PIN and passphrase are required" });
+      }
+      
+      if (!validatePin(pin)) {
+        return res.status(400).json({ message: "PIN must be 4-6 digits" });
+      }
+      
+      if (!validatePassphrase(passphrase)) {
+        return res.status(400).json({ message: "Passphrase must be at least 8 characters and contain only letters, numbers, and special characters" });
+      }
+      
+      // Generate consistent user ID
+      const userId = generateUserId(pin, passphrase);
+      
+      // Create session
+      const sessionToken = createSession(userId, pin, passphrase);
+      
+      res.json({
+        success: true,
+        userId,
+        sessionToken,
+        message: "Login successful"
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    try {
+      const { sessionToken } = req.body;
+      
+      if (sessionToken) {
+        removeSession(sessionToken);
+      }
+      
+      res.json({ success: true, message: "Logout successful" });
+    } catch (error) {
+      res.status(500).json({ message: "Logout failed" });
+    }
+  });
+
+  app.get("/api/auth/verify", async (req, res) => {
+    try {
+      const sessionToken = req.headers["x-session-token"] as string;
+      
+      if (!sessionToken) {
+        return res.status(401).json({ message: "No session token provided" });
+      }
+      
+      const session = getSession(sessionToken);
+      if (!session) {
+        return res.status(401).json({ message: "Invalid or expired session" });
+      }
+      
+      res.json({
+        success: true,
+        userId: session.userId,
+        message: "Session valid"
+      });
+    } catch (error) {
+      res.status(500).json({ message: "Session verification failed" });
+    }
+  });
+
+  // Middleware to extract user ID from session
+  const authenticateUser = (req: AuthenticatedRequest, res: any, next: any) => {
+    const sessionToken = req.headers["x-session-token"] as string;
     const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+    
+    if (sessionToken) {
+      const session = getSession(sessionToken);
+      if (session) {
+        req.userId = session.userId;
+        return next();
+      }
+    }
+    
+    if (userId) {
+      // Fallback for backward compatibility
+      req.userId = userId;
+      return next();
+    }
+    
+    res.status(401).json({ message: "Authentication required" });
+  };
+
+  // Snippets routes
+  app.get("/api/snippets", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       const snippets = await storage.getSnippets(userId);
       res.json(snippets);
@@ -17,9 +124,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/snippets", async (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+  app.post("/api/snippets", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       const data = insertSnippetSchema.parse(req.body);
       const existing = await storage.getSnippetByTrigger(data.trigger, userId);
@@ -36,9 +142,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/snippets/:id", async (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+  app.put("/api/snippets/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       const id = parseInt(req.params.id);
       const data = insertSnippetSchema.partial().parse(req.body);
@@ -61,9 +166,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/snippets/:id", async (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+  app.delete("/api/snippets/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteSnippet(id, userId);
@@ -77,9 +181,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Clipboard routes
-  app.get("/api/clipboard", async (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+  app.get("/api/clipboard", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       const items = await storage.getClipboardItems(userId);
       res.json(items);
@@ -88,9 +191,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/clipboard", async (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+  app.post("/api/clipboard", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       const data = insertClipboardItemSchema.parse(req.body);
       const item = await storage.createClipboardItem(data, userId);
@@ -103,9 +205,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/clipboard/:id", async (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+  app.delete("/api/clipboard/:id", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       const id = parseInt(req.params.id);
       const deleted = await storage.deleteClipboardItem(id, userId);
@@ -118,9 +219,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/clipboard", async (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    if (!userId) return res.status(401).json({ message: "Missing userId" });
+  app.delete("/api/clipboard", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    const userId = req.userId!;
     try {
       await storage.clearClipboardHistory(userId);
       res.json({ message: "Clipboard history cleared" });
@@ -130,7 +230,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Settings routes
-  app.get("/api/settings", async (req, res) => {
+  app.get("/api/settings", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       const settings = await storage.getSettings();
       res.json(settings);
@@ -139,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/settings", async (req, res) => {
+  app.put("/api/settings", authenticateUser, async (req: AuthenticatedRequest, res) => {
     try {
       console.log("PUT /api/settings - Request body:", req.body);
       const data = insertSettingsSchema.partial().parse(req.body);

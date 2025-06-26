@@ -12,9 +12,18 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const sessionToken = localStorage.getItem("sessionToken");
   const userKey = localStorage.getItem("userKey");
+  
   const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
-  if (userKey) headers["x-user-id"] = userKey;
+  
+  // Use session token if available, otherwise fall back to userKey
+  if (sessionToken) {
+    headers["x-session-token"] = sessionToken;
+  } else if (userKey) {
+    headers["x-user-id"] = userKey;
+  }
+  
   const res = await fetch(url, {
     method,
     headers,
@@ -32,9 +41,18 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
+    const sessionToken = localStorage.getItem("sessionToken");
     const userKey = localStorage.getItem("userKey");
+    
     const headers: Record<string, string> = {};
-    if (userKey) headers["x-user-id"] = userKey;
+    
+    // Use session token if available, otherwise fall back to userKey
+    if (sessionToken) {
+      headers["x-session-token"] = sessionToken;
+    } else if (userKey) {
+      headers["x-user-id"] = userKey;
+    }
+    
     const res = await fetch(queryKey[0] as string, {
       credentials: "include",
       headers,
