@@ -35,6 +35,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
       category: "General",
       description: "",
     },
+    mode: "onChange",
   });
 
   // Get existing snippets to extract categories
@@ -146,10 +147,14 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
       const timestamp = Date.now();
       const uniqueTrigger = data.trigger ? `${data.trigger}-${timestamp}` : `snippet-${timestamp}`;
       
-      return await apiRequest("POST", "/api/snippets", {
+      const response = await apiRequest("POST", "/api/snippets", {
         ...data,
         trigger: uniqueTrigger,
       });
+      
+      // Parse the response
+      const result = await response.json();
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
@@ -160,6 +165,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
       onClose();
     },
     onError: (error: Error) => {
+      console.error("Create snippet error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create snippet",
@@ -170,7 +176,11 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertSnippet) => {
-      return await apiRequest("PUT", `/api/snippets/${editingSnippet!.id}`, data);
+      const response = await apiRequest("PUT", `/api/snippets/${editingSnippet!.id}`, data);
+      
+      // Parse the response
+      const result = await response.json();
+      return result;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
@@ -181,6 +191,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
       onClose();
     },
     onError: (error: Error) => {
+      console.error("Update snippet error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to update snippet",
@@ -189,7 +200,40 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
     },
   });
 
+  const handleManualSave = async () => {
+    const formData = form.getValues();
+    console.log("Manual save triggered with data:", formData);
+    
+    if (!formData.title.trim() || !formData.content.trim()) {
+      toast({
+        title: "Validation Error",
+        description: "Title and content are required",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      if (editingSnippet) {
+        console.log("Manual update snippet:", editingSnippet.id);
+        await updateMutation.mutateAsync(formData);
+      } else {
+        console.log("Manual create new snippet");
+        await createMutation.mutateAsync(formData);
+      }
+    } catch (error) {
+      console.error("Manual snippet submission error:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const onSubmit = async (data: InsertSnippet) => {
+    console.log("Submitting snippet data:", data);
+    console.log("Form is valid:", form.formState.isValid);
+    console.log("Form errors:", form.formState.errors);
+    
     if (!data.title.trim() || !data.content.trim()) {
       toast({
         title: "Validation Error",
@@ -202,10 +246,15 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
     setIsSaving(true);
     try {
       if (editingSnippet) {
+        console.log("Updating snippet:", editingSnippet.id);
         await updateMutation.mutateAsync(data);
       } else {
+        console.log("Creating new snippet");
         await createMutation.mutateAsync(data);
       }
+    } catch (error) {
+      console.error("Snippet submission error:", error);
+      // Error handling is done in the mutation onError callbacks
     } finally {
       setIsSaving(false);
     }
@@ -228,9 +277,19 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
       }
     } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
+      e.stopPropagation();
+      console.log("Ctrl/Cmd + Enter pressed, submitting form");
       form.handleSubmit(onSubmit)();
     }
   };
+
+  // Debug form state
+  useEffect(() => {
+    const subscription = form.watch((value) => {
+      console.log("Form values changed:", value);
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   if (!isOpen) return null;
 
@@ -407,35 +466,47 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
                   </FormItem>
                 )}
               />
+
+              {/* Form Actions */}
+              <div className="flex items-center justify-between pt-4">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleClose}
+                  className="flex items-center gap-2 text-[13px] font-medium text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-xl px-4 py-2"
+                  style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-gray-500 font-mono">⌘+Enter to save</span>
+                  <Button
+                    type="button"
+                    onClick={handleManualSave}
+                    disabled={isSaving}
+                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2 text-[13px] font-medium"
+                    style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+                  >
+                    <Save className="h-4 w-4" />
+                    Manual Save
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSaving}
+                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 py-2 text-[13px] font-medium"
+                    style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+                  >
+                    <Save className="h-4 w-4" />
+                    {isSaving ? "Saving..." : editingSnippet ? "Update Snippet" : "Create Snippet"}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Hidden submit button for keyboard shortcuts */}
+              <button type="submit" style={{ display: 'none' }} />
             </form>
           </Form>
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 border-t border-gray-700 bg-gray-900/80">
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={handleClose}
-            className="flex items-center gap-2 text-[13px] font-medium text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-xl px-4 py-2"
-            style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-          >
-            <X className="h-4 w-4" />
-            Cancel
-          </Button>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500 font-mono">⌘+Enter to save</span>
-            <Button
-              type="submit"
-              disabled={isSaving}
-              onClick={form.handleSubmit(onSubmit)}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 py-2 text-[13px] font-medium"
-              style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-            >
-              <Save className="h-4 w-4" />
-              {isSaving ? "Saving..." : editingSnippet ? "Update Snippet" : "Create Snippet"}
-            </Button>
-          </div>
         </div>
       </div>
     </div>
