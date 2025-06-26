@@ -7,8 +7,10 @@ import { z } from "zod";
 export async function registerRoutes(app: Express): Promise<Server> {
   // Snippets routes
   app.get("/api/snippets", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
-      const snippets = await storage.getSnippets();
+      const snippets = await storage.getSnippets(userId);
       res.json(snippets);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch snippets" });
@@ -16,16 +18,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/snippets", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
       const data = insertSnippetSchema.parse(req.body);
-      
-      // Check if trigger already exists
-      const existing = await storage.getSnippetByTrigger(data.trigger);
+      const existing = await storage.getSnippetByTrigger(data.trigger, userId);
       if (existing) {
         return res.status(400).json({ message: "Trigger already exists" });
       }
-      
-      const snippet = await storage.createSnippet(data);
+      const snippet = await storage.createSnippet(data, userId);
       res.status(201).json(snippet);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -36,19 +37,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.put("/api/snippets/:id", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
       const id = parseInt(req.params.id);
       const data = insertSnippetSchema.partial().parse(req.body);
-      
-      // Check if new trigger conflicts with existing snippets
       if (data.trigger) {
-        const existing = await storage.getSnippetByTrigger(data.trigger);
+        const existing = await storage.getSnippetByTrigger(data.trigger, userId);
         if (existing && existing.id !== id) {
           return res.status(400).json({ message: "Trigger already exists" });
         }
       }
-      
-      const snippet = await storage.updateSnippet(id, data);
+      const snippet = await storage.updateSnippet(id, data, userId);
       if (!snippet) {
         return res.status(404).json({ message: "Snippet not found" });
       }
@@ -62,9 +62,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/snippets/:id", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
       const id = parseInt(req.params.id);
-      const deleted = await storage.deleteSnippet(id);
+      const deleted = await storage.deleteSnippet(id, userId);
       if (!deleted) {
         return res.status(404).json({ message: "Snippet not found" });
       }
@@ -76,8 +78,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Clipboard routes
   app.get("/api/clipboard", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
-      const items = await storage.getClipboardItems();
+      const items = await storage.getClipboardItems(userId);
       res.json(items);
     } catch (error) {
       res.status(500).json({ message: "Failed to fetch clipboard items" });
@@ -85,9 +89,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/clipboard", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
       const data = insertClipboardItemSchema.parse(req.body);
-      const item = await storage.createClipboardItem(data);
+      const item = await storage.createClipboardItem(data, userId);
       res.status(201).json(item);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -98,9 +104,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/clipboard/:id", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
       const id = parseInt(req.params.id);
-      const deleted = await storage.deleteClipboardItem(id);
+      const deleted = await storage.deleteClipboardItem(id, userId);
       if (!deleted) {
         return res.status(404).json({ message: "Clipboard item not found" });
       }
@@ -111,8 +119,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.delete("/api/clipboard", async (req, res) => {
+    const userId = req.headers["x-user-id"] as string;
+    if (!userId) return res.status(401).json({ message: "Missing userId" });
     try {
-      await storage.clearClipboardHistory();
+      await storage.clearClipboardHistory(userId);
       res.json({ message: "Clipboard history cleared" });
     } catch (error) {
       res.status(500).json({ message: "Failed to clear clipboard history" });

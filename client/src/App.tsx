@@ -13,7 +13,10 @@ import { Button } from "@/components/ui/button";
 import { Eye, EyeOff } from "lucide-react";
 import ClipboardHistory from "@/components/clipboard-history";
 import SnippetManager from "@/components/snippet-manager";
-import type { Snippet } from "@/shared/schema";
+import SnippetEditor from "@/components/snippet-editor";
+import { useClipboardMonitor } from "@/hooks/use-clipboard-monitor";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import type { Snippet } from "@shared/schema";
 
 function Router() {
   return (
@@ -277,13 +280,32 @@ function App() {
               onEditSnippet={snippet => setEditingSnippet(snippet)}
               onNewSnippet={() => setEditingSnippet(null)}
             />
+            <SnippetEditor
+              isOpen={editingSnippet !== null}
+              onClose={() => setEditingSnippet(null)}
+              editingSnippet={editingSnippet}
+            />
             <Router />
             <button onClick={handleLogout} style={{ position: 'fixed', top: 12, right: 12, zIndex: 1000 }} className="text-xs bg-gray-200 px-3 py-1 rounded hover:bg-gray-300">Logout</button>
+            <ClipboardMonitorWrapper />
+            <KeyboardShortcutsWrapper />
           </TooltipProvider>
         </QueryClientProvider>
       )}
     </>
   );
+}
+
+// Wrapper component to use the clipboard monitor hook
+function ClipboardMonitorWrapper() {
+  useClipboardMonitor();
+  return null;
+}
+
+// Wrapper component to use the keyboard shortcuts hook
+function KeyboardShortcutsWrapper() {
+  useKeyboardShortcuts();
+  return null;
 }
 
 export default App;

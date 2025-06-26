@@ -10,6 +10,7 @@ export const snippets = pgTable("snippets", {
   category: text("category"),
   description: text("description"),
   parentId: integer("parent_id"),
+  userId: text("user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -18,6 +19,7 @@ export const clipboardItems = pgTable("clipboard_items", {
   id: serial("id").primaryKey(),
   content: text("content").notNull(),
   type: text("type").notNull().default("text"), // text, url, code
+  userId: text("user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
