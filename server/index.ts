@@ -62,13 +62,22 @@ app.use((req, res, next) => {
   
   console.log(`Environment detection: app.get("env") = "${app.get("env")}", process.env.NODE_ENV = "${process.env.NODE_ENV}", isDevelopment = ${isDevelopment}, isProduction = ${isProduction}, buildFilesExist = ${buildFilesExist}`);
   
-  // Use static serving if we're in production OR if build files exist (indicating a build was run)
-  if (isDevelopment && !buildFilesExist) {
+  // Force static serving in production or if build files exist
+  if (isProduction || buildFilesExist) {
+    console.log("Setting up static file serving...");
+    serveStatic(app);
+  } else if (isDevelopment) {
     console.log("Setting up Vite development server...");
     await setupVite(app, server);
   } else {
-    console.log("Setting up static file serving...");
-    serveStatic(app);
+    // Fallback: if we can't determine, try static first, then fallback to Vite
+    console.log("Environment unclear, trying static serving first...");
+    try {
+      serveStatic(app);
+    } catch (error) {
+      console.log("Static serving failed, falling back to Vite development server...");
+      await setupVite(app, server);
+    }
   }
 
   // ALWAYS serve the app on port 5001
