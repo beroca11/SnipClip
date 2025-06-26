@@ -4,20 +4,15 @@ import ws from 'ws';
 import * as schema from "@shared/schema";
 
 // Configure Neon for serverless environment - proper WebSocket constructor
-neonConfig.webSocketConstructor = ws.default || ws;
+neonConfig.webSocketConstructor = ws;
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
-}
-
-export const pool = new Pool({ 
+// Only create pool if DATABASE_URL is available
+export const pool = process.env.DATABASE_URL ? new Pool({ 
   connectionString: process.env.DATABASE_URL,
   // Add connection pooling configuration to handle connection issues
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
-});
+}) : null;
 
-export const db = drizzle({ client: pool, schema });
+export const db = pool ? drizzle({ client: pool, schema }) : null;

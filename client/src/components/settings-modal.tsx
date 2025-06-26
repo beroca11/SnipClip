@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Settings, Save, X, Keyboard } from "lucide-react";
+import { Settings, Save, X, Keyboard, TrashIcon } from "lucide-react";
 import { PopupOverlay } from "@/components/popup-overlay";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -13,6 +13,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { insertSettingsSchema, type Settings as SettingsType, type InsertSettings } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { ShortcutInput } from "@/components/ui/shortcut-input";
+import { ShortcutTester } from "@/components/ui/shortcut-tester";
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -56,11 +58,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertSettings) => {
-      return await apiRequest("/api/settings", {
-        method: "PUT",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      return await apiRequest("PUT", "/api/settings", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/settings"] });
@@ -80,6 +78,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   });
 
   const onSubmit = async (data: InsertSettings) => {
+    console.log("Submitting settings", data);
     setIsSaving(true);
     try {
       await updateMutation.mutateAsync(data);
@@ -155,10 +154,24 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           <FormLabel>Snippets Shortcut</FormLabel>
                           <FormControl>
                             <div className="space-y-3">
-                              <Input 
-                                placeholder="e.g., ctrl+;" 
+                              <ShortcutInput
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                placeholder="e.g., ctrl+;"
                                 className="rounded-xl font-mono"
-                                {...field} 
+                                showSaveButton={true}
+                                onSave={async (value) => {
+                                  await updateMutation.mutateAsync({
+                                    snippetShortcut: value
+                                  });
+                                }}
+                              />
+                              <ShortcutTester 
+                                shortcut={field.value || ""} 
+                                onTrigger={() => {
+                                  // This would trigger the snippets modal in a real app
+                                  console.log("Snippets shortcut triggered!");
+                                }}
                               />
                               <div className="flex gap-2 text-sm text-gray-600">
                                 <span>Examples:</span>
@@ -181,10 +194,24 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                           <FormLabel>Clipboard History Shortcut</FormLabel>
                           <FormControl>
                             <div className="space-y-3">
-                              <Input 
-                                placeholder="e.g., ctrl+shift+v" 
+                              <ShortcutInput
+                                value={field.value || ""}
+                                onChange={field.onChange}
+                                placeholder="e.g., ctrl+shift+v"
                                 className="rounded-xl font-mono"
-                                {...field} 
+                                showSaveButton={true}
+                                onSave={async (value) => {
+                                  await updateMutation.mutateAsync({
+                                    clipboardShortcut: value
+                                  });
+                                }}
+                              />
+                              <ShortcutTester 
+                                shortcut={field.value || ""} 
+                                onTrigger={() => {
+                                  // This would trigger the clipboard modal in a real app
+                                  console.log("Clipboard shortcut triggered!");
+                                }}
                               />
                               <div className="flex gap-2 text-sm text-gray-600">
                                 <span>Examples:</span>

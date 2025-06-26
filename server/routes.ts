@@ -131,10 +131,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.put("/api/settings", async (req, res) => {
     try {
+      console.log("PUT /api/settings - Request body:", req.body);
       const data = insertSettingsSchema.partial().parse(req.body);
+      console.log("PUT /api/settings - Parsed data:", data);
       const settings = await storage.updateSettings(data);
+      console.log("PUT /api/settings - Updated settings:", settings);
       res.json(settings);
     } catch (error) {
+      console.error("PUT /api/settings - Error:", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }

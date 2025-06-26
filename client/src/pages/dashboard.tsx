@@ -2,20 +2,83 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Code, ClipboardList, Keyboard, Settings } from "lucide-react";
+import { Code, ClipboardList, Keyboard, Settings as SettingsIcon } from "lucide-react";
 import SnippetManager from "@/components/snippet-manager";
 import ClipboardHistory from "@/components/clipboard-history";
 import SnippetEditor from "@/components/snippet-editor";
 import SettingsModal from "@/components/settings-modal";
+import FolderCreationModal from "@/components/folder-creation-modal";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useClipboardMonitor } from "@/hooks/use-clipboard-monitor";
-import type { Snippet, ClipboardItem } from "@shared/schema";
+import type { Snippet, ClipboardItem, Settings } from "@shared/schema";
+import { Link } from "wouter";
+
+// Legacy keyboard shortcuts hook for opening overlays
+function useLegacyKeyboardShortcuts({ onSnippetsOpen, onClipboardOpen }: {
+  onSnippetsOpen: () => void;
+  onClipboardOpen: () => void;
+}) {
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ["/api/settings"],
+    refetchInterval: 1000, // Refetch every second to get real-time updates
+  });
+
+  useEffect(() => {
+    const parseShortcut = (shortcut: string) => {
+      if (!shortcut) return { modifiers: [], key: "" };
+      
+      const parts = shortcut.toLowerCase().split('+');
+      const modifiers = parts.slice(0, -1);
+      const key = parts[parts.length - 1];
+      return { modifiers, key };
+    };
+
+    const checkShortcut = (e: KeyboardEvent, shortcut: string) => {
+      if (!shortcut) return false;
+      
+      const { modifiers, key } = parseShortcut(shortcut);
+      
+      const pressedModifiers: string[] = [];
+      if (e.ctrlKey || e.metaKey) pressedModifiers.push('ctrl');
+      if (e.altKey) pressedModifiers.push('alt');
+      if (e.shiftKey) pressedModifiers.push('shift');
+      
+      const pressedKey = e.key.toLowerCase();
+      
+      return (
+        modifiers.length === pressedModifiers.length &&
+        modifiers.every(mod => pressedModifiers.includes(mod)) &&
+        key === pressedKey
+      );
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!settings) return;
+
+      // Check snippet shortcut
+      if (checkShortcut(e, settings.snippetShortcut)) {
+        e.preventDefault();
+        onSnippetsOpen();
+      }
+      
+      // Check clipboard shortcut
+      if (checkShortcut(e, settings.clipboardShortcut)) {
+        e.preventDefault();
+        onClipboardOpen();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [onSnippetsOpen, onClipboardOpen, settings]);
+}
 
 export default function Dashboard() {
   const [snippetModalOpen, setSnippetModalOpen] = useState(false);
   const [clipboardModalOpen, setClipboardModalOpen] = useState(false);
   const [snippetEditorOpen, setSnippetEditorOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [folderCreationModalOpen, setFolderCreationModalOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
 
   const { data: snippets = [] } = useQuery<Snippet[]>({
@@ -26,11 +89,18 @@ export default function Dashboard() {
     queryKey: ["/api/clipboard"],
   });
 
-  // Initialize keyboard shortcuts
-  useKeyboardShortcuts({
+  const { data: settings } = useQuery<Settings>({
+    queryKey: ["/api/settings"],
+  });
+
+  // Initialize legacy keyboard shortcuts for opening overlays
+  useLegacyKeyboardShortcuts({
     onSnippetsOpen: () => setSnippetModalOpen(true),
     onClipboardOpen: () => setClipboardModalOpen(true),
   });
+
+  // Initialize new snippet keyboard shortcuts
+  useKeyboardShortcuts();
 
   // Initialize clipboard monitoring
   useClipboardMonitor();
@@ -44,6 +114,11 @@ export default function Dashboard() {
   const handleNewSnippet = () => {
     setEditingSnippet(null);
     setSnippetEditorOpen(true);
+    setSnippetModalOpen(false);
+  };
+
+  const handleCreateFolder = () => {
+    setFolderCreationModalOpen(true);
     setSnippetModalOpen(false);
   };
 
@@ -78,34 +153,48 @@ export default function Dashboard() {
       <div className="p-8 max-w-5xl mx-auto">
         <Card className="mb-8 border-0 shadow-lg rounded-xl">
           <CardContent className="p-8">
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">SnipClip</h1>
-                <p className="text-lg text-gray-600 mt-2">The future of productivity is here</p>
-                <p className="text-sm text-gray-500 mt-1">We're the most trusted place for managing your snippets and clipboard</p>
+            <div className="flex flex-col md:flex-row items-center justify-between mb-10 gap-6 md:gap-0">
+              {/* Left: Title, subtitle, description */}
+              <div className="flex flex-col items-start max-w-xs md:max-w-sm">
+                <h1 className="text-4xl font-extrabold text-gray-900 mb-2">SnipClip</h1>
+                <p className="text-lg text-gray-700 mb-1">The future of productivity is here</p>
+                <p className="text-sm text-gray-400 leading-snug">We're the most trusted place for managing your snippets and clipboard</p>
               </div>
-              <div className="flex gap-4">
+              {/* Right: Button group */}
+              <div className="flex flex-wrap gap-4 md:gap-6 items-center justify-center">
                 <Button 
                   onClick={() => setSnippetModalOpen(true)}
-                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium bg-primary hover:bg-primary/90 text-white rounded-xl shadow-sm"
+                  className="flex items-center gap-2 px-7 py-3 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                  style={{ minWidth: 140 }}
                 >
-                  <Code className="h-4 w-4" />
+                  <Code className="h-5 w-5" />
                   <span>Snippets</span>
-                  <span className="text-xs bg-blue-700 px-2 py-1 rounded-lg">Ctrl+;</span>
+                  <span className="ml-2 px-2 py-0.5 rounded bg-blue-800 text-xs font-mono font-medium">{settings?.snippetShortcut || "alt+enter"}</span>
                 </Button>
+                <Link href="/snippets">
+                  <Button 
+                    className="flex items-center gap-2 px-7 py-3 text-base font-semibold bg-gray-900 hover:bg-gray-800 text-white rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-400 transition-all border-2 border-gray-900"
+                    style={{ minWidth: 170 }}
+                  >
+                    <Code className="h-5 w-5" />
+                    <span>Manage Snippets</span>
+                  </Button>
+                </Link>
                 <Button 
                   onClick={() => setClipboardModalOpen(true)}
-                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium bg-primary hover:bg-primary/90 text-white rounded-xl shadow-sm"
+                  className="flex items-center gap-2 px-7 py-3 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all"
+                  style={{ minWidth: 140 }}
                 >
-                  <ClipboardList className="h-4 w-4" />
+                  <ClipboardList className="h-5 w-5" />
                   <span>Clipboard</span>
-                  <span className="text-xs bg-blue-700 px-2 py-1 rounded-lg">Ctrl+Shift+V</span>
+                  <span className="ml-2 px-2 py-0.5 rounded bg-blue-800 text-xs font-mono font-medium">{settings?.clipboardShortcut || "ctrl+alt+enter"}</span>
                 </Button>
                 <Button 
                   onClick={() => setSettingsModalOpen(true)}
-                  className="flex items-center gap-3 px-6 py-3 text-sm font-medium bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl shadow-sm"
+                  className="flex items-center gap-2 px-7 py-3 text-base font-semibold bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-2xl shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all"
+                  style={{ minWidth: 120 }}
                 >
-                  <Settings className="h-4 w-4" />
+                  <SettingsIcon className="h-5 w-5" />
                   <span>Settings</span>
                 </Button>
               </div>
@@ -175,29 +264,6 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
-
-            {/* Keyboard Shortcuts Help */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <h4 className="text-sm font-medium text-gray-900 mb-3">Keyboard Shortcuts</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Open Snippets</span>
-                  <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">Ctrl + ;</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Open Clipboard History</span>
-                  <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">Ctrl + Shift + V</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Navigate Results</span>
-                  <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">↑ ↓</kbd>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Select Item</span>
-                  <kbd className="px-2 py-1 bg-white border border-gray-300 rounded text-xs font-mono">Enter</kbd>
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -227,6 +293,11 @@ export default function Dashboard() {
       <SettingsModal
         isOpen={settingsModalOpen}
         onClose={() => setSettingsModalOpen(false)}
+      />
+
+      <FolderCreationModal
+        isOpen={folderCreationModalOpen}
+        onClose={() => setFolderCreationModalOpen(false)}
       />
     </div>
   );

@@ -9,6 +9,7 @@ export const snippets = pgTable("snippets", {
   trigger: text("trigger").notNull().unique(),
   category: text("category"),
   description: text("description"),
+  parentId: integer("parent_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

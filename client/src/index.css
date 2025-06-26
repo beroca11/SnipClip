@@ -187,6 +187,33 @@
     @apply bg-blue-900;
   }
 
+  /* Custom scrollbar for clipboard history overlay */
+  .clipboard-scrollbar::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .clipboard-scrollbar::-webkit-scrollbar-track {
+    background: #1f2937; /* gray-800 */
+    border-radius: 4px;
+  }
+
+  .clipboard-scrollbar::-webkit-scrollbar-thumb {
+    background: #3b82f6; /* blue-500 - bright blue */
+    border-radius: 4px;
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.5); /* blue glow */
+  }
+
+  .clipboard-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #2563eb; /* blue-600 - darker on hover */
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.7); /* stronger glow on hover */
+  }
+
+  /* Firefox scrollbar for clipboard history */
+  .clipboard-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #3b82f6 #1f2937; /* blue-500 thumb, gray-800 track */
+  }
+
   /* Improved focus visibility */
   button:focus-visible,
   input:focus-visible,

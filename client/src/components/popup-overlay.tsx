@@ -47,7 +47,12 @@ export function PopupOverlay({ isOpen, onClose, children, title, icon }: PopupOv
                   {icon}
                 </div>
               )}
-              <h2 className="text-xl font-bold text-gray-900">{title}</h2>
+              <h2 
+                className="text-[18px] font-semibold text-gray-900"
+                style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+              >
+                {title}
+              </h2>
             </div>
             <Button
               variant="ghost"

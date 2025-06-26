@@ -10,7 +10,7 @@ import {
   type InsertSettings
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, gt } from "drizzle-orm";
 
 export interface IStorage {
   // Snippets
@@ -166,6 +166,27 @@ Best regards,
   }
 
   async createClipboardItem(insertItem: InsertClipboardItem): Promise<ClipboardItem> {
+    // Check for recent duplicates (within last 5 seconds)
+    const recentItems = Array.from(this.clipboardItems.values())
+      .filter(item => {
+        const timeDiff = Date.now() - item.createdAt.getTime();
+        return timeDiff < 5000; // 5 seconds
+      });
+    
+    // If the same content was added recently, don't add it again
+    const isDuplicate = recentItems.some(item => 
+      item.content === insertItem.content && 
+      item.type === (insertItem.type || "text")
+    );
+    
+    if (isDuplicate) {
+      // Return the existing item instead of creating a new one
+      return recentItems.find(item => 
+        item.content === insertItem.content && 
+        item.type === (insertItem.type || "text")
+      )!;
+    }
+
     const id = this.currentClipboardId++;
     const item: ClipboardItem = {
       ...insertItem,
@@ -246,6 +267,23 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createClipboardItem(item: InsertClipboardItem): Promise<ClipboardItem> {
+    // Check for recent duplicates (within last 5 seconds)
+    const fiveSecondsAgo = new Date(Date.now() - 5000);
+    const recentItems = await db.select()
+      .from(clipboardItems)
+      .where(
+        and(
+          eq(clipboardItems.content, item.content),
+          eq(clipboardItems.type, item.type || "text"),
+          gt(clipboardItems.createdAt, fiveSecondsAgo)
+        )
+      );
+    
+    // If the same content was added recently, don't add it again
+    if (recentItems.length > 0) {
+      return recentItems[0]; // Return the existing item
+    }
+
     const [newItem] = await db.insert(clipboardItems).values(item).returning();
     
     // Clean up old items beyond limit
@@ -297,4 +335,5 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Use in-memory storage if DATABASE_URL is not available
+export const storage = process.env.DATABASE_URL ? new DatabaseStorage() : new MemStorage();
