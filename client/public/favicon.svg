@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="#3b82f6" stroke="#1d4ed8" stroke-width="2"/>
+  
+  <!-- Clipboard -->
+  <rect x="8" y="6" width="12" height="16" rx="1" fill="white" stroke="#1d4ed8" stroke-width="1"/>
+  <rect x="10" y="8" width="8" height="1" fill="#1d4ed8"/>
+  <rect x="10" y="10" width="6" height="1" fill="#1d4ed8"/>
+  <rect x="10" y="12" width="7" height="1" fill="#1d4ed8"/>
+  <rect x="10" y="14" width="5" height="1" fill="#1d4ed8"/>
+  
+  <!-- Scissors -->
+  <path d="M20 8 L24 12 L20 16" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M20 16 L24 20 L20 24" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="22" cy="10" r="1.5" fill="white"/>
+  <circle cx="22" cy="22" r="1.5" fill="white"/>
+</svg> 
