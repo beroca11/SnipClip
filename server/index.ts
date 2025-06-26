@@ -52,9 +52,22 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   const isDevelopment = app.get("env") === "development" || process.env.NODE_ENV === "development";
-  if (isDevelopment) {
+  const isProduction = app.get("env") === "production" || process.env.NODE_ENV === "production";
+  
+  // Check if build files exist to determine if we should use static serving
+  const fs = await import("fs");
+  const path = await import("path");
+  const distPath = path.resolve(import.meta.dirname, "..", "dist", "public");
+  const buildFilesExist = fs.existsSync(distPath);
+  
+  console.log(`Environment detection: app.get("env") = "${app.get("env")}", process.env.NODE_ENV = "${process.env.NODE_ENV}", isDevelopment = ${isDevelopment}, isProduction = ${isProduction}, buildFilesExist = ${buildFilesExist}`);
+  
+  // Use static serving if we're in production OR if build files exist (indicating a build was run)
+  if (isDevelopment && !buildFilesExist) {
+    console.log("Setting up Vite development server...");
     await setupVite(app, server);
   } else {
+    console.log("Setting up static file serving...");
     serveStatic(app);
   }
 
