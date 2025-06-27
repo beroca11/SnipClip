@@ -80,25 +80,22 @@ app.use((req, res, next) => {
     }
   }
 
-  // ALWAYS serve the app on port 5002
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-    const port = 5002;
-    server.listen({
-      port,
-      host: "0.0.0.0",
-      reusePort: true,
-    }, async () => {
-      log(`serving on port ${port}`);
-      
-      // Run any pending migrations
-      try {
-        const { runMigrations } = await import("./migrations");
-        await runMigrations();
-      } catch (error) {
-        console.log("Migration system not available or no migrations needed");
-      }
-    });
+  // Serve the app on port 5001 (production) or 5002 (development)
+  const port = process.env.NODE_ENV === "production" ? 5001 : 5002;
+  server.listen({
+    port,
+    host: "0.0.0.0",
+    reusePort: true,
+  }, async () => {
+    log(`serving on port ${port}`);
+    // Run any pending migrations
+    try {
+      const { runMigrations } = await import("./migrations");
+      await runMigrations();
+    } catch (error) {
+      console.log("Migration system not available or no migrations needed");
+    }
+  });
   } catch (error) {
     console.error('Failed to start server:', error);
     process.exit(1);

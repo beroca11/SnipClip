@@ -163,24 +163,17 @@ export default function SnippetsPage() {
               Back
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Snippet Management</h1>
-              <p className="text-lg text-gray-600 mt-1">Organize and manage your code snippets</p>
+              <h1 className="text-4xl font-extrabold text-gray-900 tracking-tight">Snippet Management</h1>
+              <p className="text-lg text-gray-500 mt-1">Organize and manage your code snippets</p>
             </div>
           </div>
-          <div className="flex gap-3">
-            <Button
-              onClick={handleCreateFolder}
-              variant="outline"
-              className="flex items-center gap-2"
-            >
-              <FolderPlus className="h-4 w-4" />
-              New Folder
-            </Button>
+          <div className="flex gap-4">
             <Button
               onClick={handleNewSnippet}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-xl px-6 py-2 text-base font-semibold transition-all duration-150"
+              style={{ boxShadow: '0 4px 16px 0 rgba(37, 99, 235, 0.10)' }}
             >
-              <Plus className="h-4 w-4" />
+              <Plus className="h-5 w-5" />
               New Snippet
             </Button>
           </div>
@@ -188,54 +181,54 @@ export default function SnippetsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="border-0 shadow-sm">
+          <Card className="border-0 shadow-md rounded-2xl bg-white">
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-blue-50 rounded-xl mr-4">
+                <div className="p-3 bg-blue-100 rounded-xl mr-4">
                   <Code className="text-blue-600 h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">Total Snippets</p>
-                  <p className="text-2xl font-bold text-gray-900">{totalSnippets}</p>
+                  <p className="text-sm text-gray-500 font-medium">Total Snippets</p>
+                  <p className="text-2xl font-extrabold text-gray-900">{totalSnippets}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="border-0 shadow-md rounded-2xl bg-white">
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-emerald-50 rounded-xl mr-4">
+                <div className="p-3 bg-emerald-100 rounded-xl mr-4">
                   <Keyboard className="text-emerald-600 h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">With Shortcuts</p>
-                  <p className="text-2xl font-bold text-gray-900">{snippetsWithShortcuts}</p>
+                  <p className="text-sm text-gray-500 font-medium">With Shortcuts</p>
+                  <p className="text-2xl font-extrabold text-gray-900">{snippetsWithShortcuts}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="border-0 shadow-md rounded-2xl bg-white">
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-purple-50 rounded-xl mr-4">
+                <div className="p-3 bg-purple-100 rounded-xl mr-4">
                   <Folder className="text-purple-600 h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">Categories</p>
-                  <p className="text-2xl font-bold text-gray-900">{categories.length - 1}</p>
+                  <p className="text-sm text-gray-500 font-medium">Categories</p>
+                  <p className="text-2xl font-extrabold text-gray-900">{categories.length - 1}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="border-0 shadow-md rounded-2xl bg-white">
             <CardContent className="p-6">
               <div className="flex items-center">
-                <div className="p-3 bg-orange-50 rounded-xl mr-4">
+                <div className="p-3 bg-orange-100 rounded-xl mr-4">
                   <Settings className="text-orange-600 h-6 w-6" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-600 font-medium">Active</p>
-                  <p className="text-2xl font-bold text-gray-900">{filteredSnippets.length}</p>
+                  <p className="text-sm text-gray-500 font-medium">Active</p>
+                  <p className="text-2xl font-extrabold text-gray-900">{filteredSnippets.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -243,7 +236,7 @@ export default function SnippetsPage() {
         </div>
 
         {/* Filters and Search */}
-        <Card className="border-0 shadow-sm mb-6">
+        <Card className="border-0 shadow-md rounded-2xl bg-white mb-6">
           <CardContent className="p-6">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
@@ -253,7 +246,7 @@ export default function SnippetsPage() {
                     placeholder="Search snippets..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 bg-gray-100 border-0 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -263,7 +256,7 @@ export default function SnippetsPage() {
                     key={category}
                     variant={selectedCategory === category ? "default" : "outline"}
                     onClick={() => setSelectedCategory(category)}
-                    className="text-sm"
+                    className={`text-sm rounded-xl px-4 py-2 ${selectedCategory === category ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 border-0 hover:bg-blue-50'}`}
                   >
                     {category}
                   </Button>

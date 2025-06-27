@@ -2,23 +2,8 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
-export default defineConfig({
-  plugins: [
-    react(),
-    // Only include Replit plugins in Replit environment
-    ...(process.env.REPL_ID !== undefined ? [
-      // Dynamic import to avoid errors in non-Replit environments
-      (await import("@replit/vite-plugin-runtime-error-modal")).default(),
-    ] : []),
-    ...(process.env.NODE_ENV !== "production" &&
-    process.env.REPL_ID !== undefined
-      ? [
-          await import("@replit/vite-plugin-cartographer").then((m) =>
-            m.cartographer(),
-          ),
-        ]
-      : []),
-  ],
+export default defineConfig(({ mode }) => ({
+  plugins: [react()],
   resolve: {
     alias: {
       "@": path.resolve(import.meta.dirname, "client", "src"),
@@ -32,11 +17,11 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    port: 5002,
+    port: mode === "development" ? 5002 : 5001,
     fs: {
       strict: true,
       deny: ["**/.*"],
     },
     allowedHosts: ["snipclip.onrender.com", "localhost", "127.0.0.1"],
   },
-});
+}));

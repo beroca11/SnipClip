@@ -395,7 +395,7 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gradient-to-r from-slate-900/50 to-slate-800/50 border-t border-slate-700/50">
+        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-slate-900/50 to-slate-800/50 border-t border-slate-700/50">
           <div className="flex items-center justify-between">
             <Button
               variant="ghost"

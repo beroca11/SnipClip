@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Save, X, Keyboard } from "lucide-react";
+import { Plus, Save, X, Keyboard, ChevronUp, ChevronDown } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -25,6 +25,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
   const [shortcut, setShortcut] = useState("");
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
   const shortcutInputRef = useRef<HTMLInputElement>(null);
+  const formContentRef = useRef<HTMLDivElement>(null);
 
   const form = useForm<InsertSnippet>({
     resolver: zodResolver(insertSnippetSchema),
@@ -280,6 +281,30 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
       e.stopPropagation();
       console.log("Ctrl/Cmd + Enter pressed, submitting form");
       form.handleSubmit(onSubmit)();
+    } else if (e.key === "PageUp") {
+      e.preventDefault();
+      handleScrollUp();
+    } else if (e.key === "PageDown") {
+      e.preventDefault();
+      handleScrollDown();
+    }
+  };
+
+  const handleScrollUp = () => {
+    if (formContentRef.current) {
+      formContentRef.current.scrollBy({
+        top: -300,
+        behavior: 'smooth'
+      });
+    }
+  };
+
+  const handleScrollDown = () => {
+    if (formContentRef.current) {
+      formContentRef.current.scrollBy({
+        top: 300,
+        behavior: 'smooth'
+      });
     }
   };
 
@@ -314,18 +339,41 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
               {editingSnippet ? "Edit Snippet" : "Create New Snippet"}
             </h2>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleClose}
-            className="h-8 w-8 p-0 rounded-lg hover:bg-gray-700/60 text-gray-400 hover:text-white"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleScrollUp}
+              className="h-8 w-8 p-0 rounded-lg hover:bg-gray-700/60 text-gray-400 hover:text-white"
+              title="Scroll Up (Page Up)"
+            >
+              <ChevronUp className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleScrollDown}
+              className="h-8 w-8 p-0 rounded-lg hover:bg-gray-700/60 text-gray-400 hover:text-white"
+              title="Scroll Down (Page Down)"
+            >
+              <ChevronDown className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleClose}
+              className="h-8 w-8 p-0 rounded-lg hover:bg-gray-700/60 text-gray-400 hover:text-white"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Form Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+        <div 
+          ref={formContentRef}
+          className="flex-1 overflow-y-auto px-6 py-6 space-y-6"
+        >
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
               <div className="grid grid-cols-2 gap-6">
@@ -466,47 +514,36 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
                   </FormItem>
                 )}
               />
-
-              {/* Form Actions */}
-              <div className="flex items-center justify-between pt-4">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleClose}
-                  className="flex items-center gap-2 text-[13px] font-medium text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-xl px-4 py-2"
-                  style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-                >
-                  <X className="h-4 w-4" />
-                  Cancel
-                </Button>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-gray-500 font-mono">⌘+Enter to save</span>
-                  <Button
-                    type="button"
-                    onClick={handleManualSave}
-                    disabled={isSaving}
-                    className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2 text-[13px] font-medium"
-                    style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-                  >
-                    <Save className="h-4 w-4" />
-                    Manual Save
-                  </Button>
-                  <Button
-                    type="submit"
-                    disabled={isSaving}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl px-6 py-2 text-[13px] font-medium"
-                    style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-                  >
-                    <Save className="h-4 w-4" />
-                    {isSaving ? "Saving..." : editingSnippet ? "Update Snippet" : "Create Snippet"}
-                  </Button>
-                </div>
-              </div>
-              
               {/* Hidden submit button for keyboard shortcuts */}
               <button type="submit" style={{ display: 'none' }} />
             </form>
           </Form>
+        </div>
+        {/* Sticky Footer for Actions */}
+        <div className="sticky-footer-actions px-6 py-4 border-t border-gray-700 bg-[#181A20] flex items-center justify-between" style={{ position: 'sticky', bottom: 0, zIndex: 10 }}>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handleClose}
+            className="flex items-center gap-2 text-[13px] font-medium text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-xl px-4 py-2"
+            style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+          >
+            <X className="h-4 w-4" />
+            Cancel
+          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-gray-500 font-mono">⌘+Enter to save • Page Up/Down to scroll</span>
+            <Button
+              type="button"
+              onClick={handleManualSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2 text-[13px] font-medium"
+              style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+            >
+              <Save className="h-4 w-4" />
+              Save
+            </Button>
+          </div>
         </div>
       </div>
     </div>
