@@ -7,4 +7,6 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        value: "postgresql://your-username:your-password@ep-your-project.region.aws.neon.tech/your-database?sslmode=require"
     plan: free 

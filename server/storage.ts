@@ -2,6 +2,9 @@ import {
   snippets, 
   clipboardItems, 
   settings,
+  snippetsSQLite,
+  clipboardItemsSQLite,
+  settingsSQLite,
   type Snippet, 
   type InsertSnippet,
   type ClipboardItem,
@@ -13,6 +16,12 @@ import { db } from "./db";
 import { eq, desc, and, gt } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
+
+// Determine which schema to use based on database type
+const isSQLite = db && db.dialect && db.dialect.name === 'sqlite';
+const activeSnippets = isSQLite ? snippetsSQLite : snippets;
+const activeClipboardItems = isSQLite ? clipboardItemsSQLite : clipboardItems;
+const activeSettings = isSQLite ? settingsSQLite : settings;
 
 export interface IStorage {
   // Snippets
@@ -434,24 +443,24 @@ export class DatabaseStorage implements IStorage {
   // Snippets
   async getSnippets(userId: string): Promise<Snippet[]> {
     if (!db) throw new Error("Database not available");
-    return await db.select().from(snippets).where(eq(snippets.userId, userId)).orderBy(desc(snippets.createdAt));
+    return await db.select().from(activeSnippets).where(eq(activeSnippets.userId, userId)).orderBy(desc(activeSnippets.createdAt));
   }
 
   async getSnippet(id: number, userId: string): Promise<Snippet | undefined> {
     if (!db) throw new Error("Database not available");
-    const [snippet] = await db.select().from(snippets).where(and(eq(snippets.id, id), eq(snippets.userId, userId)));
+    const [snippet] = await db.select().from(activeSnippets).where(and(eq(activeSnippets.id, id), eq(activeSnippets.userId, userId)));
     return snippet;
   }
 
   async getSnippetByTrigger(trigger: string, userId: string): Promise<Snippet | undefined> {
     if (!db) throw new Error("Database not available");
-    const [snippet] = await db.select().from(snippets).where(and(eq(snippets.trigger, trigger), eq(snippets.userId, userId)));
+    const [snippet] = await db.select().from(activeSnippets).where(and(eq(activeSnippets.trigger, trigger), eq(activeSnippets.userId, userId)));
     return snippet;
   }
 
   async createSnippet(snippet: InsertSnippet, userId: string): Promise<Snippet> {
     if (!db) throw new Error("Database not available");
-    const [newSnippet] = await db.insert(snippets).values({
+    const [newSnippet] = await db.insert(activeSnippets).values({
       ...snippet,
       userId,
       updatedAt: new Date()
@@ -461,23 +470,23 @@ export class DatabaseStorage implements IStorage {
 
   async updateSnippet(id: number, updateData: Partial<InsertSnippet>, userId: string): Promise<Snippet | undefined> {
     if (!db) throw new Error("Database not available");
-    const [updated] = await db.update(snippets)
+    const [updated] = await db.update(activeSnippets)
       .set({ ...updateData, updatedAt: new Date() })
-      .where(and(eq(snippets.id, id), eq(snippets.userId, userId)))
+      .where(and(eq(activeSnippets.id, id), eq(activeSnippets.userId, userId)))
       .returning();
     return updated;
   }
 
   async deleteSnippet(id: number, userId: string): Promise<boolean> {
     if (!db) throw new Error("Database not available");
-    const result = await db.delete(snippets).where(and(eq(snippets.id, id), eq(snippets.userId, userId)));
+    const result = await db.delete(activeSnippets).where(and(eq(activeSnippets.id, id), eq(activeSnippets.userId, userId)));
     return result.rowCount !== null && result.rowCount > 0;
   }
 
   // Clipboard
   async getClipboardItems(userId: string): Promise<ClipboardItem[]> {
     if (!db) throw new Error("Database not available");
-    return await db.select().from(clipboardItems).where(eq(clipboardItems.userId, userId)).orderBy(desc(clipboardItems.createdAt)).limit(100);
+    return await db.select().from(activeClipboardItems).where(eq(activeClipboardItems.userId, userId)).orderBy(desc(activeClipboardItems.createdAt)).limit(100);
   }
 
   async createClipboardItem(item: InsertClipboardItem, userId: string): Promise<ClipboardItem> {
@@ -485,23 +494,23 @@ export class DatabaseStorage implements IStorage {
     // Check for recent duplicates (within last 5 seconds)
     const fiveSecondsAgo = new Date(Date.now() - 5000);
     const recentItems = await db.select()
-      .from(clipboardItems)
+      .from(activeClipboardItems)
       .where(and(
-        eq(clipboardItems.content, item.content),
-        eq(clipboardItems.type, item.type || "text"),
-        gt(clipboardItems.createdAt, fiveSecondsAgo),
-        eq(clipboardItems.userId, userId)
+        eq(activeClipboardItems.content, item.content),
+        eq(activeClipboardItems.type, item.type || "text"),
+        gt(activeClipboardItems.createdAt, fiveSecondsAgo),
+        eq(activeClipboardItems.userId, userId)
       ));
     if (recentItems.length > 0) {
       return recentItems[0];
     }
-    const [newItem] = await db.insert(clipboardItems).values({ ...item, userId }).returning();
+    const [newItem] = await db.insert(activeClipboardItems).values({ ...item, userId }).returning();
     // Clean up old items beyond limit
-    const allItems = await db.select().from(clipboardItems).where(eq(clipboardItems.userId, userId)).orderBy(desc(clipboardItems.createdAt));
+    const allItems = await db.select().from(activeClipboardItems).where(eq(activeClipboardItems.userId, userId)).orderBy(desc(activeClipboardItems.createdAt));
     if (allItems.length > 100) {
       const toDelete = allItems.slice(100);
       for (const item of toDelete) {
-        await db.delete(clipboardItems).where(eq(clipboardItems.id, item.id));
+        await db.delete(activeClipboardItems).where(eq(activeClipboardItems.id, item.id));
       }
     }
     return newItem;
@@ -509,22 +518,22 @@ export class DatabaseStorage implements IStorage {
 
   async deleteClipboardItem(id: number, userId: string): Promise<boolean> {
     if (!db) throw new Error("Database not available");
-    const result = await db.delete(clipboardItems).where(and(eq(clipboardItems.id, id), eq(clipboardItems.userId, userId)));
+    const result = await db.delete(activeClipboardItems).where(and(eq(activeClipboardItems.id, id), eq(activeClipboardItems.userId, userId)));
     return result.rowCount !== null && result.rowCount > 0;
   }
 
   async clearClipboardHistory(userId: string): Promise<void> {
     if (!db) throw new Error("Database not available");
-    await db.delete(clipboardItems).where(eq(clipboardItems.userId, userId));
+    await db.delete(activeClipboardItems).where(eq(activeClipboardItems.userId, userId));
   }
 
   // Settings
   async getSettings(): Promise<Settings> {
     if (!db) throw new Error("Database not available");
-    const [setting] = await db.select().from(settings).limit(1);
+    const [setting] = await db.select().from(activeSettings).limit(1);
     if (!setting) {
       // Create default settings
-      const [newSettings] = await db.insert(settings).values({
+      const [newSettings] = await db.insert(activeSettings).values({
         snippetShortcut: "ctrl+;",
         clipboardShortcut: "ctrl+shift+v",
         clipboardEnabled: 1,
@@ -540,13 +549,13 @@ export class DatabaseStorage implements IStorage {
   async updateSettings(updateData: Partial<InsertSettings>): Promise<Settings> {
     if (!db) throw new Error("Database not available");
     const currentSettings = await this.getSettings();
-    const [updated] = await db.update(settings)
+    const [updated] = await db.update(activeSettings)
       .set(updateData)
-      .where(eq(settings.id, currentSettings.id))
+      .where(eq(activeSettings.id, currentSettings.id))
       .returning();
     return updated;
   }
 }
 
-// Use database storage if DATABASE_URL is available, otherwise use file storage for persistence
-export const storage = process.env.DATABASE_URL ? new DatabaseStorage() : new FileStorage();
+// Use database storage if available (PostgreSQL or SQLite), otherwise use file storage for persistence
+export const storage = db ? new DatabaseStorage() : new FileStorage();
