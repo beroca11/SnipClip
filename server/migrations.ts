@@ -106,6 +106,16 @@ async function runSQLiteMigrations() {
   
   // Ensure all snippets have a folder (assign to General if null)
   await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id IS NULL`, [generalFolderId]);
+  
+  // Add a trigger to automatically assign new snippets to General folder if no folder is specified
+  await db.run(sql`
+    CREATE TRIGGER IF NOT EXISTS set_default_folder
+    AFTER INSERT ON snippets
+    WHEN NEW.folder_id IS NULL
+    BEGIN
+      UPDATE snippets SET folder_id = (SELECT id FROM folders WHERE name = 'General' LIMIT 1) WHERE id = NEW.id;
+    END
+  `);
 
   // Add parent_id and sort_order columns to folders if not exist
   await db.run(sql`ALTER TABLE folders ADD COLUMN IF NOT EXISTS parent_id INTEGER`);
@@ -184,6 +194,25 @@ async function runPostgreSQLMigrations() {
   
   // Ensure all snippets have a folder (assign to General if null)
   await db.run(sql`UPDATE snippets SET folder_id = $1 WHERE folder_id IS NULL`, [generalFolderId]);
+  
+  // Add a trigger to automatically assign new snippets to General folder if no folder is specified
+  await db.run(sql`
+    CREATE OR REPLACE FUNCTION set_default_folder()
+    RETURNS TRIGGER AS $$
+    BEGIN
+      IF NEW.folder_id IS NULL THEN
+        NEW.folder_id := (SELECT id FROM folders WHERE name = 'General' LIMIT 1);
+      END IF;
+      RETURN NEW;
+    END;
+    $$ LANGUAGE plpgsql;
+    
+    DROP TRIGGER IF EXISTS set_default_folder_trigger ON snippets;
+    CREATE TRIGGER set_default_folder_trigger
+      BEFORE INSERT ON snippets
+      FOR EACH ROW
+      EXECUTE FUNCTION set_default_folder();
+  `);
 
   // Add parent_id and sort_order columns to folders if not exist
   await db.run(sql`

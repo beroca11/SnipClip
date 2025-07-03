@@ -53,9 +53,9 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
 
   // Memoized data processing for better performance
   const { groupedSnippets, flattenedSnippets, filteredItems } = useMemo(() => {
-    // Group snippets by category, excluding folder markers
+    // Group snippets by folder, excluding folder markers
     const grouped = snippets.reduce((acc, snippet) => {
-      const category = snippet.category || "General";
+      const category = "General"; // Default category since we don't have folder names here
       if (!acc[category]) {
         acc[category] = [];
       }
@@ -100,8 +100,7 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
             const snippet = item.data as Snippet;
             return snippet.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
                    snippet.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                   snippet.trigger.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                   (snippet.category && snippet.category.toLowerCase().includes(searchTerm.toLowerCase()));
+                   snippet.trigger.toLowerCase().includes(searchTerm.toLowerCase());
           }
         })
       : flattened;

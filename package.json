@@ -15,7 +15,8 @@
     "db:init": "npx tsx scripts/setup-db.ts init",
     "db:test": "npx tsx scripts/setup-db.ts test",
     "db:reset": "npx tsx scripts/setup-db.ts reset",
-    "test:db": "node scripts/test-db.js"
+    "test:db": "node scripts/test-db.js",
+    "fix:folders": "node scripts/fix-snippet-folders.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

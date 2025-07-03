@@ -5,7 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Plus, Save, X, Keyboard, ChevronUp, ChevronDown } from "lucide-react";
+import { Plus, Save, X, Keyboard, ChevronUp, ChevronDown, Folder } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -28,6 +28,15 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
   const [isRecordingShortcut, setIsRecordingShortcut] = useState(false);
   const shortcutInputRef = useRef<HTMLInputElement>(null);
   const formContentRef = useRef<HTMLDivElement>(null);
+
+  // Fetch folders for dropdown
+  const { data: folders = [] } = useQuery<any[]>({
+    queryKey: ["/api/folders"],
+    queryFn: async () => {
+      const res = await apiRequest("GET", "/api/folders");
+      return res.json();
+    },
+  });
 
   const form = useForm<InsertSnippet>({
     resolver: zodResolver(insertSnippetSchema),
@@ -130,7 +139,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
       const response = await apiRequest("POST", "/api/snippets", {
         ...data,
         trigger: uniqueTrigger,
-        folderId: folderId ?? data.folderId ?? null,
+        folderId: data.folderId ?? folderId ?? null,
       });
       
       // Parse the response
@@ -160,7 +169,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
     mutationFn: async (data: InsertSnippet) => {
       const response = await apiRequest("PUT", `/api/snippets/${editingSnippet!.id}`, {
         ...data,
-        folderId: folderId ?? data.folderId ?? null,
+        folderId: data.folderId ?? folderId ?? null,
       });
       
       // Parse the response
@@ -410,6 +419,56 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
               </div>
 
               <div className="grid grid-cols-2 gap-6">
+                <FormField
+                  control={form.control}
+                  name="folderId"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel 
+                        className="text-[13px] font-medium text-blue-200"
+                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
+                      >
+                        Folder
+                      </FormLabel>
+                      <FormControl>
+                        <Select
+                          value={field.value?.toString() || ""}
+                          onValueChange={(value) => field.onChange(value ? Number(value) : null)}
+                        >
+                          <SelectTrigger className="rounded-xl text-[14px] border-0 bg-blue-900/50 text-white focus:ring-2 focus:ring-blue-400 focus:outline-none border border-blue-700/30">
+                            <SelectValue placeholder="Select folder..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {folders.map((folder) => (
+                              <SelectItem key={folder.id} value={folder.id.toString()}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-4 h-4 rounded bg-purple-500/20 flex items-center justify-center">
+                                    <div className="w-2 h-2 rounded bg-purple-500"></div>
+                                  </div>
+                                  {folder.name}
+                                  {folder.name === "General" && (
+                                    <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                      Default
+                                    </span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                      {field.value && (
+                        <p className="text-[11px] text-blue-300/70 mt-1">
+                          Snippet will be created in: <span className="font-medium text-blue-200">
+                            {folders.find(f => f.id === field.value)?.name || 'Unknown folder'}
+                          </span>
+                        </p>
+                      )}
+                    </FormItem>
+                  )}
+                />
+
                 <FormItem>
                   <FormLabel 
                     className="text-[13px] font-medium text-blue-200"

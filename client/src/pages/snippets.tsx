@@ -27,6 +27,7 @@ import SnippetEditor from "@/components/snippet-editor";
 import FolderCreationModal from "@/components/folder-creation-modal";
 import type { Snippet } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Helper: Build a nested folder tree from flat folder list
 function buildFolderTree(folders: { id: number|null, name: string, parentId?: number|null }[]): { id: number|null, name: string, parentId?: number|null, children: any[] }[] {
@@ -403,6 +404,32 @@ export default function SnippetsPage() {
               </div>
             </div>
             <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-600">Folder:</span>
+                <Select
+                  value={selectedFolderId?.toString() || ""}
+                  onValueChange={(value) => setSelectedFolderId(value ? Number(value) : null)}
+                >
+                  <SelectTrigger className="w-48 bg-white border border-gray-200 rounded-lg shadow-sm">
+                    <SelectValue placeholder="Select folder..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {folders.map((folder) => (
+                      <SelectItem key={folder.id} value={folder.id.toString()}>
+                        <div className="flex items-center gap-2">
+                          <Folder className="h-4 w-4 text-purple-500" />
+                          {folder.name}
+                          {folder.name === "General" && (
+                            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                              Default
+                            </span>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
               <Button
                 onClick={handleNewSnippet}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-full px-6 py-2 text-base font-semibold transition-all duration-150"
@@ -485,6 +512,34 @@ export default function SnippetsPage() {
                     />
                   </div>
                 </div>
+                <div className="w-full md:w-64">
+                  <label className="text-sm font-medium text-gray-700 mb-2 block">
+                    Current Folder
+                  </label>
+                  <Select
+                    value={selectedFolderId?.toString() || ""}
+                    onValueChange={(value) => setSelectedFolderId(value ? Number(value) : null)}
+                  >
+                    <SelectTrigger className="w-full bg-gray-100 border-0 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                      <SelectValue placeholder="Select folder..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {folders.map((folder) => (
+                        <SelectItem key={folder.id} value={folder.id.toString()}>
+                          <div className="flex items-center gap-2">
+                            <Folder className="h-4 w-4 text-purple-500" />
+                            {folder.name}
+                            {folder.name === "General" && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                Default
+                              </span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -529,7 +584,19 @@ export default function SnippetsPage() {
                       <tr key={snippet.id} className="border-b border-gray-100 hover:bg-blue-50/60 transition group cursor-pointer rounded-xl">
                         <td className="py-2 px-2 font-semibold text-gray-900 truncate max-w-[180px]" title={snippet.title}>{snippet.title}</td>
                         <td className="py-2 px-2 text-gray-700 truncate max-w-[320px]" title={snippet.content}>{snippet.content.length > 60 ? snippet.content.slice(0, 60) + '…' : snippet.content}</td>
-                        <td className="py-2 px-2 text-gray-700">{getFolderName(snippet.folderId, folders)}</td>
+                        <td className="py-2 px-2 text-gray-700">
+                          <div className="flex items-center gap-2">
+                            <Folder className="h-4 w-4 text-purple-500" />
+                            <span className={snippet.folderId === selectedFolderId ? "font-medium text-blue-600" : ""}>
+                              {getFolderName(snippet.folderId, folders)}
+                            </span>
+                            {snippet.folderId === selectedFolderId && (
+                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-2 px-2 text-gray-500 text-right">{snippet.updatedAt ? new Date(snippet.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "-"}</td>
                         <td className="py-2 px-2 text-right">
                           <div className="flex justify-end gap-2">
@@ -565,11 +632,13 @@ export default function SnippetsPage() {
           setEditingSnippet(null);
         }}
         editingSnippet={editingSnippet}
+        folderId={selectedFolderId}
         onCreate={async (snippet) => {
           await copyToClipboard(snippet.content);
+          const folderName = getFolderName(snippet.folderId, folders);
           toast({
-            title: "Snippet copied",
-            description: `"${snippet.title}" has been copied to clipboard.`,
+            title: "Snippet created and copied",
+            description: `"${snippet.title}" has been created in ${folderName} and copied to clipboard.`,
           });
         }}
       />
@@ -577,6 +646,81 @@ export default function SnippetsPage() {
         isOpen={folderCreationModalOpen}
         onClose={() => setFolderCreationModalOpen(false)}
       />
+      
+      {/* Move Snippet Modal */}
+      <Dialog open={moveSnippetId !== null} onOpenChange={() => setMoveSnippetId(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Folder className="h-5 w-5 text-blue-600" />
+              Move Snippet
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
+                Select Target Folder
+              </label>
+              <Select
+                value={moveTargetFolderId?.toString() || ""}
+                onValueChange={(value) => setMoveTargetFolderId(value ? Number(value) : null)}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a folder..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {folders.map((folder) => (
+                    <SelectItem key={folder.id} value={folder.id.toString()}>
+                      <div className="flex items-center gap-2">
+                        <Folder className="h-4 w-4 text-purple-500" />
+                        {folder.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {moveSnippetId && (
+              <div className="bg-gray-50 rounded-lg p-3">
+                <p className="text-sm text-gray-600">
+                  Moving: <span className="font-medium text-gray-900">
+                    {snippets.find(s => s.id === moveSnippetId)?.title}
+                  </span>
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setMoveSnippetId(null);
+                setMoveTargetFolderId(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (moveSnippetId && moveTargetFolderId !== null) {
+                  moveSnippetMutation.mutate({
+                    snippetId: moveSnippetId,
+                    folderId: moveTargetFolderId
+                  });
+                  toast({
+                    title: "Snippet moved",
+                    description: "The snippet has been moved to the selected folder.",
+                  });
+                }
+              }}
+              disabled={moveTargetFolderId === null || moveSnippetMutation.isPending}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {moveSnippetMutation.isPending ? "Moving..." : "Move Snippet"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

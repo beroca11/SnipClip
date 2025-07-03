@@ -8,7 +8,7 @@ import { z } from "zod";
 export const folders = pgTable("folders", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
-  parentId: integer("parent_id").references(() => folders.id),
+  parentId: integer("parent_id").references((): any => folders.id),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
