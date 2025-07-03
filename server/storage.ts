@@ -38,7 +38,7 @@ export interface IStorage {
   getFolders(userId: string): Promise<any[]>;
   getFolder(id: number, userId: string): Promise<any | undefined>;
   createFolder(name: string, userId: string): Promise<any>;
-  updateFolder(id: number, name: string, userId: string, parentId?: number | null, sortOrder?: number): Promise<any | undefined>;
+  updateFolder(id: number, name: string, userId: string, sortOrder?: number): Promise<any | undefined>;
   deleteFolder(id: number, userId: string): Promise<boolean>;
   
   // Clipboard
@@ -565,17 +565,16 @@ export class DatabaseStorage implements IStorage {
     const activeFolders = isSQLite ? foldersSQLite : folders;
     const now = new Date();
     // Only insert a new folder row, do not update any snippets
-    const [folder] = await db.insert(activeFolders).values({ name, parentId: null, sortOrder: 0, createdAt: now, updatedAt: now }).returning();
+    const [folder] = await db.insert(activeFolders).values({ name, sortOrder: 0, createdAt: now, updatedAt: now }).returning();
     return folder;
   }
 
-  async updateFolder(id: number, name: string, userId: string, parentId?: number | null, sortOrder?: number): Promise<any | undefined> {
+  async updateFolder(id: number, name: string, userId: string, sortOrder?: number): Promise<any | undefined> {
     if (!db) throw new Error("Database not available");
     const activeFolders = isSQLite ? foldersSQLite : folders;
     const now = new Date();
-    // Allow updating name, parentId, and sortOrder
+    // Allow updating name and sortOrder
     const updateData: any = { name, updatedAt: now };
-    if (typeof parentId !== 'undefined') updateData.parentId = parentId;
     if (typeof sortOrder !== 'undefined') updateData.sortOrder = sortOrder;
     const [folder] = await db.update(activeFolders).set(updateData).where(eq(activeFolders.id, id)).returning();
     return folder;

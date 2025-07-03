@@ -9,10 +9,9 @@ import { useToast } from "@/hooks/use-toast";
 interface FolderCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  parentFolder?: string | null;
 }
 
-export default function FolderCreationModal({ isOpen, onClose, parentFolder }: FolderCreationModalProps) {
+export default function FolderCreationModal({ isOpen, onClose }: FolderCreationModalProps) {
   const [folderName, setFolderName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -20,10 +19,10 @@ export default function FolderCreationModal({ isOpen, onClose, parentFolder }: F
 
   useEffect(() => {
     if (isOpen) {
-      setFolderName(parentFolder ? parentFolder + "/" : "");
+      setFolderName("");
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [isOpen, parentFolder]);
+  }, [isOpen]);
 
   const createFolderMutation = useMutation({
     mutationFn: async (name: string) => {

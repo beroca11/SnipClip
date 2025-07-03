@@ -8,7 +8,6 @@ import { z } from "zod";
 export const folders = pgTable("folders", {
   id: serial("id").primaryKey(),
   name: text("name").notNull().unique(),
-  parentId: integer("parent_id").references((): any => folders.id),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -48,7 +47,6 @@ export const settings = pgTable("settings", {
 export const foldersSQLite = sqliteTableCore("folders", {
   id: integerSQLite("id").primaryKey({ autoIncrement: true }),
   name: textSQLite("name").notNull().unique(),
-  parentId: integerSQLite("parent_id"),
   sortOrder: integerSQLite("sort_order").notNull().default(0),
   createdAt: integerSQLite("created_at").notNull().default(sql`(strftime('%s', 'now'))`),
   updatedAt: integerSQLite("updated_at").notNull().default(sql`(strftime('%s', 'now'))`),

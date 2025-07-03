@@ -41,7 +41,6 @@ async function runSQLiteMigrations() {
       name TEXT NOT NULL UNIQUE,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-      parent_id INTEGER,
       sort_order INTEGER NOT NULL DEFAULT 0
     )
   `);
@@ -98,11 +97,16 @@ async function runSQLiteMigrations() {
     generalFolderId = insert.lastID;
   }
   
-  // Move all snippets from non-General folders to General folder
-  await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id IN (SELECT id FROM folders WHERE name != 'General')`, [generalFolderId]);
+  // Handle existing subfolders by moving their snippets to General and flattening the structure
+  const subfolders = await db.all(sql`SELECT id, name FROM folders WHERE parent_id IS NOT NULL`);
+  for (const subfolder of subfolders) {
+    // Move snippets from subfolder to General
+    await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id = ?`, [generalFolderId, subfolder.id]);
+    console.log(`Moved snippets from subfolder "${subfolder.name}" to General`);
+  }
   
-  // Remove all non-General folders to ensure clean state
-  await db.run(sql`DELETE FROM folders WHERE name != 'General'`);
+  // Remove all subfolders (folders with parent_id)
+  await db.run(sql`DELETE FROM folders WHERE parent_id IS NOT NULL`);
   
   // Ensure all snippets have a folder (assign to General if null)
   await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id IS NULL`, [generalFolderId]);
@@ -117,8 +121,7 @@ async function runSQLiteMigrations() {
     END
   `);
 
-  // Add parent_id and sort_order columns to folders if not exist
-  await db.run(sql`ALTER TABLE folders ADD COLUMN IF NOT EXISTS parent_id INTEGER`);
+  // Add sort_order column to folders if not exist
   await db.run(sql`ALTER TABLE folders ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`);
 }
 
@@ -130,7 +133,6 @@ async function runPostgreSQLMigrations() {
       name TEXT NOT NULL UNIQUE,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      parent_id INTEGER REFERENCES folders(id),
       sort_order INTEGER DEFAULT 0
     )
   `);
@@ -186,11 +188,16 @@ async function runPostgreSQLMigrations() {
     generalFolderId = insert.id;
   }
   
-  // Move all snippets from non-General folders to General folder
-  await db.run(sql`UPDATE snippets SET folder_id = $1 WHERE folder_id IN (SELECT id FROM folders WHERE name != 'General')`, [generalFolderId]);
+  // Handle existing subfolders by moving their snippets to General and flattening the structure
+  const subfolders = await db.all(sql`SELECT id, name FROM folders WHERE parent_id IS NOT NULL`);
+  for (const subfolder of subfolders) {
+    // Move snippets from subfolder to General
+    await db.run(sql`UPDATE snippets SET folder_id = $1 WHERE folder_id = $2`, [generalFolderId, subfolder.id]);
+    console.log(`Moved snippets from subfolder "${subfolder.name}" to General`);
+  }
   
-  // Remove all non-General folders to ensure clean state
-  await db.run(sql`DELETE FROM folders WHERE name != 'General'`);
+  // Remove all subfolders (folders with parent_id)
+  await db.run(sql`DELETE FROM folders WHERE parent_id IS NOT NULL`);
   
   // Ensure all snippets have a folder (assign to General if null)
   await db.run(sql`UPDATE snippets SET folder_id = $1 WHERE folder_id IS NULL`, [generalFolderId]);
@@ -214,13 +221,10 @@ async function runPostgreSQLMigrations() {
       EXECUTE FUNCTION set_default_folder();
   `);
 
-  // Add parent_id and sort_order columns to folders if not exist
+  // Add sort_order column to folders if not exist
   await db.run(sql`
     DO $$
     BEGIN
-      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='folders' AND column_name='parent_id') THEN
-        ALTER TABLE folders ADD COLUMN parent_id INTEGER REFERENCES folders(id);
-      END IF;
       IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='folders' AND column_name='sort_order') THEN
         ALTER TABLE folders ADD COLUMN sort_order INTEGER DEFAULT 0;
       END IF;

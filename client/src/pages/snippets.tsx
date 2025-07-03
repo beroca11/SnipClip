@@ -29,41 +29,24 @@ import type { Snippet } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-// Helper: Build a nested folder tree from flat folder list
-function buildFolderTree(folders: { id: number|null, name: string, parentId?: number|null }[]): { id: number|null, name: string, parentId?: number|null, children: any[] }[] {
-  const map: Record<string, { id: number|null, name: string, parentId?: number|null, children: any[] }> = {};
-  const roots: { id: number|null, name: string, parentId?: number|null, children: any[] }[] = [];
-  folders.forEach((folder) => {
-    map[String(folder.id)] = { ...folder, children: [] };
-  });
-  folders.forEach((folder) => {
-    if (folder.parentId) {
-      if (map[String(folder.parentId)]) map[String(folder.parentId)].children.push(map[String(folder.id)]);
-    } else {
-      roots.push(map[String(folder.id)]);
-    }
-  });
-  return roots;
-}
-
-// Helper: Render the folder tree recursively
-function FolderTree({ nodes, selectedId, onSelect, onRename, onDelete, onCreateSubfolder }:{ nodes: { id: number|null, name: string, parentId?: number|null, children: any[] }[], selectedId: number|null, onSelect: (id: number|null) => void, onRename: (id: number|null, name: string) => void, onDelete: (id: number|null) => void, onCreateSubfolder: (parentId: number|null) => void }) {
+// Helper: Render the folder list
+function FolderList({ folders, selectedId, onSelect, onRename, onDelete, onCreateFolder }:{ folders: { id: number|null, name: string }[], selectedId: number|null, onSelect: (id: number|null) => void, onRename: (id: number|null, name: string) => void, onDelete: (id: number|null) => void, onCreateFolder: () => void }) {
   return (
-    <ul className="pl-2">
-      {nodes.map(node => {
-        const isGeneralFolder = node.name === "General";
-        const isSelected = selectedId === node.id;
+    <ul className="space-y-1">
+      {folders.map(folder => {
+        const isGeneralFolder = folder.name === "General";
+        const isSelected = selectedId === folder.id;
         
         return (
-          <li key={node.id ?? 'general'} className="mb-1">
+          <li key={folder.id ?? 'general'}>
             <div className={`flex items-center gap-1 cursor-pointer rounded-lg px-3 py-2 transition-all duration-150 ${
               isSelected 
                 ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md' 
                 : 'hover:bg-blue-50 text-gray-700 hover:text-gray-900'
             }`}
-                 onClick={() => onSelect(node.id)}>
+                 onClick={() => onSelect(folder.id)}>
               <Folder className={`h-4 w-4 mr-2 ${isGeneralFolder ? 'text-blue-500' : 'text-purple-500'}`} />
-              <span className="truncate flex-1 font-medium">{node.name}</span>
+              <span className="truncate flex-1 font-medium">{folder.name}</span>
               
               {/* Only show action buttons if not General folder */}
               {!isGeneralFolder && (
@@ -71,17 +54,8 @@ function FolderTree({ nodes, selectedId, onSelect, onRename, onDelete, onCreateS
                   <Button 
                     size="icon" 
                     variant="ghost" 
-                    className={`text-xs ${isSelected ? 'text-white hover:bg-blue-600' : 'text-blue-600 hover:text-blue-800'}`} 
-                    onClick={e => { e.stopPropagation(); onCreateSubfolder(node.id); }}
-                    title="Create subfolder"
-                  >
-                    <FolderPlus className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    size="icon" 
-                    variant="ghost" 
                     className={`${isSelected ? 'text-white hover:bg-blue-600' : 'text-blue-600 hover:text-blue-800'}`} 
-                    onClick={e => { e.stopPropagation(); onRename(node.id, node.name); }}
+                    onClick={e => { e.stopPropagation(); onRename(folder.id, folder.name); }}
                     title="Rename folder"
                   >
                     <Edit className="h-4 w-4" />
@@ -92,8 +66,8 @@ function FolderTree({ nodes, selectedId, onSelect, onRename, onDelete, onCreateS
                     className={`${isSelected ? 'text-white hover:bg-blue-600' : 'text-red-600 hover:text-red-800'}`} 
                     onClick={e => { 
                       e.stopPropagation(); 
-                      if (window.confirm(`Delete "${node.name}" folder and move all its snippets to General?`)) {
-                        onDelete(node.id); 
+                      if (window.confirm(`Delete "${folder.name}" folder and move all its snippets to General?`)) {
+                        onDelete(folder.id); 
                       }
                     }}
                     title="Delete folder"
@@ -112,9 +86,6 @@ function FolderTree({ nodes, selectedId, onSelect, onRename, onDelete, onCreateS
                 </div>
               )}
             </div>
-            {node.children && node.children.length > 0 && (
-              <FolderTree nodes={node.children} selectedId={selectedId} onSelect={onSelect} onRename={onRename} onDelete={onDelete} onCreateSubfolder={onCreateSubfolder} />
-            )}
           </li>
         );
       })}
@@ -228,7 +199,6 @@ export default function SnippetsPage() {
 
   // Find the real General folder from the folders array
   const generalFolder = folders.find(f => f.name === 'General');
-  const folderTree = buildFolderTree(folders);
 
   // Filter snippets by selected folder (use real General folder id)
   const filteredSnippets = snippets.filter(snippet => snippet.folderId === selectedFolderId)
@@ -250,8 +220,7 @@ export default function SnippetsPage() {
     setSnippetEditorOpen(true);
   };
 
-  const handleCreateFolderWithParent = (parentId: number|null) => {
-    setSelectedFolderId(parentId !== null ? parentId : null);
+  const handleCreateFolder = () => {
     setFolderCreationModalOpen(true);
   };
 
@@ -371,17 +340,17 @@ export default function SnippetsPage() {
           <div className="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg p-4 sticky top-8" style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)' }}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Folders</h2>
-              <Button size="icon" variant="ghost" onClick={() => handleCreateFolderWithParent(null)} className="text-blue-600 hover:text-blue-800 rounded-full transition-all duration-150">
+              <Button size="icon" variant="ghost" onClick={handleCreateFolder} className="text-blue-600 hover:text-blue-800 rounded-full transition-all duration-150">
                 <FolderPlus className="h-5 w-5" />
               </Button>
             </div>
-            <FolderTree
-              nodes={folderTree}
+            <FolderList
+              folders={folders}
               selectedId={selectedFolderId}
               onSelect={setSelectedFolderId}
               onRename={handleRenameFolder}
               onDelete={handleDeleteFolder}
-              onCreateSubfolder={handleCreateFolderWithParent}
+              onCreateFolder={() => setFolderCreationModalOpen(true)}
             />
           </div>
         </aside>
@@ -404,32 +373,6 @@ export default function SnippetsPage() {
               </div>
             </div>
             <div className="flex gap-4">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-600">Folder:</span>
-                <Select
-                  value={selectedFolderId?.toString() || ""}
-                  onValueChange={(value) => setSelectedFolderId(value ? Number(value) : null)}
-                >
-                  <SelectTrigger className="w-48 bg-white border border-gray-200 rounded-lg shadow-sm">
-                    <SelectValue placeholder="Select folder..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {folders.map((folder) => (
-                      <SelectItem key={folder.id} value={folder.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <Folder className="h-4 w-4 text-purple-500" />
-                          {folder.name}
-                          {folder.name === "General" && (
-                            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                              Default
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <Button
                 onClick={handleNewSnippet}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-full px-6 py-2 text-base font-semibold transition-all duration-150"
@@ -511,34 +454,6 @@ export default function SnippetsPage() {
                       className="pl-10 bg-gray-100 border-0 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                     />
                   </div>
-                </div>
-                <div className="w-full md:w-64">
-                  <label className="text-sm font-medium text-gray-700 mb-2 block">
-                    Current Folder
-                  </label>
-                  <Select
-                    value={selectedFolderId?.toString() || ""}
-                    onValueChange={(value) => setSelectedFolderId(value ? Number(value) : null)}
-                  >
-                    <SelectTrigger className="w-full bg-gray-100 border-0 rounded-xl text-gray-900 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                      <SelectValue placeholder="Select folder..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {folders.map((folder) => (
-                        <SelectItem key={folder.id} value={folder.id.toString()}>
-                          <div className="flex items-center gap-2">
-                            <Folder className="h-4 w-4 text-purple-500" />
-                            {folder.name}
-                            {folder.name === "General" && (
-                              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                                Default
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </CardContent>
