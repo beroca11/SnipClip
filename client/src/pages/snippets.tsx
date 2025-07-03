@@ -70,6 +70,13 @@ function FolderTree({ nodes, selectedId, onSelect, onRename, onDelete, onCreateS
   );
 }
 
+// Find folder name by id
+function getFolderName(folderId: number|null, folders: {id: number, name: string}[]) {
+  if (folderId == null) return 'General';
+  const folder = folders.find(f => f.id === folderId);
+  return folder ? folder.name : 'Unknown';
+}
+
 export default function SnippetsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [snippetEditorOpen, setSnippetEditorOpen] = useState(false);
@@ -257,7 +264,7 @@ export default function SnippetsPage() {
         <aside className="w-full lg:w-64 flex-shrink-0">
           <div className="bg-white rounded-2xl shadow-md p-4 sticky top-8">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900" style={{ fontFamily: 'Lato, system-ui, sans-serif' }}>Folders</h2>
+              <h2 className="text-lg font-bold text-gray-900">Folders</h2>
               <Button size="icon" variant="ghost" onClick={() => handleCreateFolderWithParent(null)} className="text-blue-600 hover:text-blue-800">
                 <FolderPlus className="h-5 w-5" />
               </Button>
@@ -401,49 +408,44 @@ export default function SnippetsPage() {
             </Card>
           ) : (
             <div className="w-full">
-              <div className="grid grid-cols-12 gap-2 px-2 py-2 border-b border-gray-300 bg-gray-100 sticky top-0 z-10 rounded-t-xl text-[14px] font-semibold" style={{ fontFamily: 'Lato, system-ui, sans-serif', fontSize: 14 }}>
-                <div className="col-span-3">Name</div>
-                <div className="col-span-5">Content</div>
-                <div className="col-span-2 text-right">Date Modified</div>
-                <div className="col-span-2 text-right">Actions</div>
-              </div>
-              <div>
-                {filteredSnippets.map((snippet) => (
-                  <div
-                    key={snippet.id}
-                    className="grid grid-cols-12 gap-2 items-center px-2 py-2 border-b border-gray-200 hover:bg-blue-100/60 transition-all text-[13px] font-normal cursor-pointer group"
-                    style={{ fontFamily: 'Lato, system-ui, sans-serif', fontSize: 13 }}
-                    onClick={async () => {
-                      await copyToClipboard(snippet.content);
-                      toast({
-                        title: "Snippet copied",
-                        description: `\"${snippet.title}\" has been copied to clipboard.`,
-                      });
-                    }}
-                  >
-                    <div className="col-span-3 font-semibold text-gray-900 truncate">{snippet.title}</div>
-                    <div className="col-span-5 text-gray-700 truncate" title={snippet.content} style={{maxWidth: '100%'}}>
-                      {snippet.content.length > 60 ? snippet.content.slice(0, 60) + '…' : snippet.content}
-                    </div>
-                    <div className="col-span-2 text-gray-500 text-right">
-                      {snippet.updatedAt ? new Date(snippet.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "-"}
-                    </div>
-                    <div className="col-span-2 flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" onClick={async (e) => { e.stopPropagation(); await copyToClipboard(snippet.content); toast({ title: "Snippet copied", description: `\"${snippet.title}\" has been copied to clipboard.` }); }} className="h-7 w-7 text-blue-600 hover:text-blue-800">
-                        <Copy className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleEditSnippet(snippet)} className="h-7 w-7 text-green-600 hover:text-green-800">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => handleDeleteSnippet(snippet.id)} className="h-7 w-7 text-red-600 hover:text-red-800" disabled={deleteSnippetMutation.isPending}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="ghost" onClick={() => setMoveSnippetId(snippet.id)} className="h-7 w-7 text-gray-600 hover:text-blue-600">
-                        <Folder className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="bg-white rounded-2xl shadow-md p-4">
+                <table className="w-full text-sm text-left">
+                  <thead>
+                    <tr className="border-b text-gray-700 font-semibold">
+                      <th className="py-3 px-2 w-1/6">Name</th>
+                      <th className="py-3 px-2 w-2/6">Content</th>
+                      <th className="py-3 px-2 w-1/6">Folder</th>
+                      <th className="py-3 px-2 w-1/6 text-right">Date Modified</th>
+                      <th className="py-3 px-2 w-1/6 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSnippets.map((snippet) => (
+                      <tr key={snippet.id} className="border-b hover:bg-blue-50 transition group cursor-pointer">
+                        <td className="py-2 px-2 font-semibold text-gray-900 truncate max-w-[180px]" title={snippet.title}>{snippet.title}</td>
+                        <td className="py-2 px-2 text-gray-700 truncate max-w-[320px]" title={snippet.content}>{snippet.content.length > 60 ? snippet.content.slice(0, 60) + '…' : snippet.content}</td>
+                        <td className="py-2 px-2 text-gray-700">{getFolderName(snippet.folderId, folders)}</td>
+                        <td className="py-2 px-2 text-gray-500 text-right">{snippet.updatedAt ? new Date(snippet.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "-"}</td>
+                        <td className="py-2 px-2 text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button size="icon" variant="ghost" title="Copy" onClick={async (e) => { e.stopPropagation(); await copyToClipboard(snippet.content); toast({ title: "Snippet copied", description: `"${snippet.title}" has been copied to clipboard.` }); }} className="h-7 w-7 text-blue-600 hover:text-blue-800">
+                              <Copy className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEditSnippet(snippet)} className="h-7 w-7 text-green-600 hover:text-green-800">
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" title="Delete" onClick={() => handleDeleteSnippet(snippet.id)} className="h-7 w-7 text-red-600 hover:text-red-800" disabled={deleteSnippetMutation.isPending}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                            <Button size="icon" variant="ghost" title="Move" onClick={() => setMoveSnippetId(snippet.id)} className="h-7 w-7 text-gray-600 hover:text-blue-600">
+                              <Folder className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -465,49 +467,11 @@ export default function SnippetsPage() {
             description: `"${snippet.title}" has been copied to clipboard.`,
           });
         }}
-        folderId={selectedFolderId}
       />
-
       <FolderCreationModal
         isOpen={folderCreationModalOpen}
         onClose={() => setFolderCreationModalOpen(false)}
-        parentFolder={selectedFolderId !== null ? String(selectedFolderId) : null}
       />
-
-      {/* Move Snippet Modal */}
-      <Dialog open={!!moveSnippetId} onOpenChange={open => { if (!open) { setMoveSnippetId(null); setMoveTargetFolderId(null); } }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Move Snippet</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <label className="block text-sm font-medium">Select target folder:</label>
-            <select
-              className="w-full rounded border px-2 py-1"
-              value={moveTargetFolderId ?? ""}
-              onChange={e => setMoveTargetFolderId(e.target.value === "" ? null : Number(e.target.value))}
-            >
-              <option value="" disabled>Select folder</option>
-              {folderTree.map(folder => (
-                <option key={folder.id ?? 'general'} value={folder.id ?? ""}>{folder.name}</option>
-              ))}
-            </select>
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => { setMoveSnippetId(null); setMoveTargetFolderId(null); }}>Cancel</Button>
-            <Button
-              onClick={() => {
-                if (moveSnippetId && moveTargetFolderId) {
-                  moveSnippetMutation.mutate({ snippetId: moveSnippetId, folderId: moveTargetFolderId });
-                }
-              }}
-              disabled={!moveTargetFolderId || moveSnippetMutation.isPending}
-            >
-              Move
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
-} 
+}
