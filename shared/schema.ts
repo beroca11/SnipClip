@@ -7,23 +7,30 @@ import { z } from "zod";
 // PostgreSQL schema
 export const folders = pgTable("folders", {
   id: serial("id").primaryKey(),
-  name: text("name").notNull().unique(),
+  name: text("name").notNull(),
+  userId: text("user_id").notNull(),
   sortOrder: integer("sort_order").default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Create a unique constraint on name + userId to prevent duplicate folder names per user
+export const foldersUniqueConstraint = sql`UNIQUE(name, user_id)`;
+
 export const snippets = pgTable("snippets", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   content: text("content").notNull(),
-  trigger: text("trigger").notNull().unique(),
+  trigger: text("trigger").notNull(),
   description: text("description"),
   folderId: integer("folder_id").references(() => folders.id),
   userId: text("user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+// Create a unique constraint on trigger + userId to prevent duplicate triggers per user
+export const snippetsUniqueConstraint = sql`UNIQUE(trigger, user_id)`;
 
 export const clipboardItems = pgTable("clipboard_items", {
   id: serial("id").primaryKey(),
@@ -46,7 +53,8 @@ export const settings = pgTable("settings", {
 // SQLite schema (for development)
 export const foldersSQLite = sqliteTableCore("folders", {
   id: integerSQLite("id").primaryKey({ autoIncrement: true }),
-  name: textSQLite("name").notNull().unique(),
+  name: textSQLite("name").notNull(),
+  userId: textSQLite("user_id").notNull(),
   sortOrder: integerSQLite("sort_order").notNull().default(0),
   createdAt: integerSQLite("created_at").notNull().default(sql`(strftime('%s', 'now'))`),
   updatedAt: integerSQLite("updated_at").notNull().default(sql`(strftime('%s', 'now'))`),
@@ -56,7 +64,7 @@ export const snippetsSQLite = sqliteTableCore("snippets", {
   id: integerSQLite("id").primaryKey({ autoIncrement: true }),
   title: textSQLite("title").notNull(),
   content: textSQLite("content").notNull(),
-  trigger: textSQLite("trigger").notNull().unique(),
+  trigger: textSQLite("trigger").notNull(),
   description: textSQLite("description"),
   folderId: integerSQLite("folder_id"),
   userId: textSQLite("user_id").notNull(),
@@ -89,6 +97,13 @@ export const insertSnippetSchema = createInsertSchema(snippets).omit({
   userId: true,
 });
 
+export const insertFolderSchema = createInsertSchema(folders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+});
+
 export const insertClipboardItemSchema = createInsertSchema(clipboardItems).omit({
   id: true,
   createdAt: true,
@@ -101,6 +116,9 @@ export const insertSettingsSchema = createInsertSchema(settings).omit({
 
 export type InsertSnippet = z.infer<typeof insertSnippetSchema>;
 export type Snippet = typeof snippets.$inferSelect;
+
+export type InsertFolder = z.infer<typeof insertFolderSchema>;
+export type Folder = typeof folders.$inferSelect;
 
 export type InsertClipboardItem = z.infer<typeof insertClipboardItemSchema>;
 export type ClipboardItem = typeof clipboardItems.$inferSelect;

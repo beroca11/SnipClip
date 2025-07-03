@@ -58,16 +58,20 @@ export class FileStorage implements IStorage {
   private snippetsFile: string;
   private clipboardFile: string;
   private settingsFile: string;
+  private foldersFile: string;
   private currentSnippetId: number;
   private currentClipboardId: number;
+  private currentFolderId: number;
 
   constructor() {
     this.dataDir = path.resolve(process.cwd(), "data");
     this.snippetsFile = path.join(this.dataDir, "snippets.json");
     this.clipboardFile = path.join(this.dataDir, "clipboard.json");
     this.settingsFile = path.join(this.dataDir, "settings.json");
+    this.foldersFile = path.join(this.dataDir, "folders.json");
     this.currentSnippetId = 1;
     this.currentClipboardId = 1;
+    this.currentFolderId = 1;
     
     // Ensure data directory exists
     if (!fs.existsSync(this.dataDir)) {
@@ -87,6 +91,11 @@ export class FileStorage implements IStorage {
     // Initialize clipboard file
     if (!fs.existsSync(this.clipboardFile)) {
       fs.writeFileSync(this.clipboardFile, JSON.stringify([], null, 2));
+    }
+
+    // Initialize folders file
+    if (!fs.existsSync(this.foldersFile)) {
+      fs.writeFileSync(this.foldersFile, JSON.stringify([], null, 2));
     }
 
     // Initialize settings file
@@ -111,9 +120,11 @@ export class FileStorage implements IStorage {
     try {
       const snippets = this.readSnippets();
       const clipboardItems = this.readClipboardItems();
+      const folders = this.readFolders();
       
       this.currentSnippetId = snippets.length > 0 ? Math.max(...snippets.map(s => s.id)) + 1 : 1;
       this.currentClipboardId = clipboardItems.length > 0 ? Math.max(...clipboardItems.map(c => c.id)) + 1 : 1;
+      this.currentFolderId = folders.length > 0 ? Math.max(...folders.map(f => f.id)) + 1 : 1;
     } catch (error) {
       console.log("Error calculating next IDs, using defaults");
     }
@@ -164,6 +175,19 @@ export class FileStorage implements IStorage {
 
   private writeSettings(settings: Settings) {
     fs.writeFileSync(this.settingsFile, JSON.stringify(settings, null, 2));
+  }
+
+  private readFolders(): any[] {
+    try {
+      const data = fs.readFileSync(this.foldersFile, 'utf8');
+      return JSON.parse(data);
+    } catch (error) {
+      return [];
+    }
+  }
+
+  private writeFolders(folders: any[]) {
+    fs.writeFileSync(this.foldersFile, JSON.stringify(folders, null, 2));
   }
 
   // Snippets
@@ -232,28 +256,88 @@ export class FileStorage implements IStorage {
 
   // Folders
   async getFolders(userId: string): Promise<any[]> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folders = this.readFolders();
+    return folders
+      .filter(folder => folder.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }
 
   async getFolder(id: number, userId: string): Promise<any | undefined> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folders = this.readFolders();
+    return folders.find(folder => folder.id === id && folder.userId === userId);
   }
 
   async createFolder(name: string, userId: string): Promise<any> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folders = this.readFolders();
+    
+    // Check if folder name already exists for this user
+    const existingFolder = folders.find(folder => folder.name === name && folder.userId === userId);
+    if (existingFolder) {
+      throw new Error("Folder name already exists for this user");
+    }
+    
+    const now = new Date();
+    const folder = {
+      id: this.currentFolderId++,
+      name,
+      userId,
+      sortOrder: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    folders.push(folder);
+    this.writeFolders(folders);
+    return folder;
   }
 
   async updateFolder(id: number, name: string, userId: string): Promise<any | undefined> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folders = this.readFolders();
+    const folderIndex = folders.findIndex(folder => folder.id === id && folder.userId === userId);
+    
+    if (folderIndex === -1) {
+      return undefined;
+    }
+    
+    // Check if new name already exists for this user (excluding current folder)
+    const existingFolder = folders.find(folder => folder.name === name && folder.userId === userId && folder.id !== id);
+    if (existingFolder) {
+      throw new Error("Folder name already exists for this user");
+    }
+    
+    const now = new Date();
+    folders[folderIndex] = {
+      ...folders[folderIndex],
+      name,
+      updatedAt: now,
+    };
+    
+    this.writeFolders(folders);
+    return folders[folderIndex];
   }
 
   async deleteFolder(id: number, userId: string): Promise<boolean> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folders = this.readFolders();
+    const folderIndex = folders.findIndex(folder => folder.id === id && folder.userId === userId);
+    
+    if (folderIndex === -1) {
+      return false;
+    }
+    
+    // Move all snippets from this folder to no folder (set folderId to null)
+    const snippets = this.readSnippets();
+    const updatedSnippets = snippets.map(snippet => 
+      snippet.folderId === id && snippet.userId === userId 
+        ? { ...snippet, folderId: null }
+        : snippet
+    );
+    this.writeSnippets(updatedSnippets);
+    
+    // Remove the folder
+    folders.splice(folderIndex, 1);
+    this.writeFolders(folders);
+    
+    return true;
   }
 
   // Clipboard
@@ -337,15 +421,19 @@ export class FileStorage implements IStorage {
 export class MemStorage implements IStorage {
   private snippets: Map<number, Snippet>;
   private clipboardItems: Map<number, ClipboardItem>;
+  private folders: Map<number, any>;
   private settings: Settings;
   private currentSnippetId: number;
   private currentClipboardId: number;
+  private currentFolderId: number;
 
   constructor() {
     this.snippets = new Map();
     this.clipboardItems = new Map();
+    this.folders = new Map();
     this.currentSnippetId = 1;
     this.currentClipboardId = 1;
+    this.currentFolderId = 1;
     this.settings = {
       id: 1,
       snippetShortcut: "ctrl+;",
@@ -412,28 +500,77 @@ export class MemStorage implements IStorage {
 
   // Folders
   async getFolders(userId: string): Promise<any[]> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    return Array.from(this.folders.values())
+      .filter(folder => folder.userId === userId)
+      .sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
   }
 
   async getFolder(id: number, userId: string): Promise<any | undefined> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folder = this.folders.get(id);
+    return folder && folder.userId === userId ? folder : undefined;
   }
 
   async createFolder(name: string, userId: string): Promise<any> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    // Check if folder name already exists for this user
+    const existingFolder = Array.from(this.folders.values())
+      .find(folder => folder.name === name && folder.userId === userId);
+    if (existingFolder) {
+      throw new Error("Folder name already exists for this user");
+    }
+    
+    const now = new Date();
+    const folder = {
+      id: this.currentFolderId++,
+      name,
+      userId,
+      sortOrder: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    this.folders.set(folder.id, folder);
+    return folder;
   }
 
   async updateFolder(id: number, name: string, userId: string): Promise<any | undefined> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folder = this.folders.get(id);
+    if (!folder || folder.userId !== userId) {
+      return undefined;
+    }
+    
+    // Check if new name already exists for this user (excluding current folder)
+    const existingFolder = Array.from(this.folders.values())
+      .find(f => f.name === name && f.userId === userId && f.id !== id);
+    if (existingFolder) {
+      throw new Error("Folder name already exists for this user");
+    }
+    
+    const now = new Date();
+    const updatedFolder = {
+      ...folder,
+      name,
+      updatedAt: now,
+    };
+    
+    this.folders.set(id, updatedFolder);
+    return updatedFolder;
   }
 
   async deleteFolder(id: number, userId: string): Promise<boolean> {
-    // Implementation needed
-    throw new Error("Method not implemented");
+    const folder = this.folders.get(id);
+    if (!folder || folder.userId !== userId) {
+      return false;
+    }
+    
+    // Move all snippets from this folder to no folder (set folderId to null)
+    Array.from(this.snippets.values())
+      .filter(snippet => snippet.folderId === id && snippet.userId === userId)
+      .forEach(snippet => {
+        this.snippets.set(snippet.id, { ...snippet, folderId: null });
+      });
+    
+    // Remove the folder
+    return this.folders.delete(id);
   }
 
   // Clipboard
@@ -550,13 +687,13 @@ export class DatabaseStorage implements IStorage {
   async getFolders(userId: string): Promise<any[]> {
     if (!db) throw new Error("Database not available");
     const activeFolders = isSQLite ? foldersSQLite : folders;
-    return await db.select().from(activeFolders);
+    return await db.select().from(activeFolders).where(eq(activeFolders.userId, userId)).orderBy(activeFolders.sortOrder);
   }
 
   async getFolder(id: number, userId: string): Promise<any | undefined> {
     if (!db) throw new Error("Database not available");
     const activeFolders = isSQLite ? foldersSQLite : folders;
-    const result = await db.select().from(activeFolders).where(eq(activeFolders.id, id));
+    const result = await db.select().from(activeFolders).where(and(eq(activeFolders.id, id), eq(activeFolders.userId, userId)));
     return result[0];
   }
 
@@ -564,8 +701,14 @@ export class DatabaseStorage implements IStorage {
     if (!db) throw new Error("Database not available");
     const activeFolders = isSQLite ? foldersSQLite : folders;
     const now = new Date();
-    // Only insert a new folder row, do not update any snippets
-    const [folder] = await db.insert(activeFolders).values({ name, sortOrder: 0, createdAt: now, updatedAt: now }).returning();
+    // Create folder with userId to make it user-specific
+    const [folder] = await db.insert(activeFolders).values({ 
+      name, 
+      userId, 
+      sortOrder: 0, 
+      createdAt: now, 
+      updatedAt: now 
+    }).returning();
     return folder;
   }
 
@@ -573,20 +716,29 @@ export class DatabaseStorage implements IStorage {
     if (!db) throw new Error("Database not available");
     const activeFolders = isSQLite ? foldersSQLite : folders;
     const now = new Date();
-    // Allow updating name and sortOrder
+    // Allow updating name and sortOrder, but only for the specific user's folder
     const updateData: any = { name, updatedAt: now };
     if (typeof sortOrder !== 'undefined') updateData.sortOrder = sortOrder;
-    const [folder] = await db.update(activeFolders).set(updateData).where(eq(activeFolders.id, id)).returning();
+    const [folder] = await db.update(activeFolders)
+      .set(updateData)
+      .where(and(eq(activeFolders.id, id), eq(activeFolders.userId, userId)))
+      .returning();
     return folder;
   }
 
   async deleteFolder(id: number, userId: string): Promise<boolean> {
     if (!db) throw new Error("Database not available");
     const activeFolders = isSQLite ? foldersSQLite : folders;
-    // Optionally, delete all snippets in this folder
     const activeSnippets = isSQLite ? snippetsSQLite : snippets;
-    await db.delete(activeSnippets).where(eq(activeSnippets.folderId, id));
-    const result = await db.delete(activeFolders).where(eq(activeFolders.id, id));
+    
+    // First, move all snippets from this folder to no folder (set folderId to null)
+    await db.update(activeSnippets)
+      .set({ folderId: null })
+      .where(and(eq(activeSnippets.folderId, id), eq(activeSnippets.userId, userId)));
+    
+    // Then delete the folder (only if it belongs to the user)
+    const result = await db.delete(activeFolders)
+      .where(and(eq(activeFolders.id, id), eq(activeFolders.userId, userId)));
     return result.rowCount !== null && result.rowCount > 0;
   }
 
