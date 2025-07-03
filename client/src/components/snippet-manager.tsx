@@ -293,7 +293,7 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
                   description: `\"${snippet.title}\" has been copied to clipboard.`,
                 });
                 onClose();
-              }}
+                          }}
               onEdit={onEditSnippet}
               onDelete={(id) => deleteSnippetMutation.mutate(id)}
             />

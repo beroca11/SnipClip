@@ -18,9 +18,10 @@ interface SnippetEditorProps {
   onClose: () => void;
   editingSnippet?: Snippet | null;
   onCreate?: (snippet: Snippet) => void;
+  folderId?: number | null;
 }
 
-export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreate }: SnippetEditorProps) {
+export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreate, folderId }: SnippetEditorProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [shortcut, setShortcut] = useState("");
@@ -34,8 +35,8 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
       title: "",
       content: "",
       trigger: "",
-      category: "General",
       description: "",
+      folderId: folderId ?? null,
     },
     mode: "onChange",
   });
@@ -70,8 +71,8 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
           title: editingSnippet.title,
           content: editingSnippet.content,
           trigger: editingSnippet.trigger,
-          category: editingSnippet.category || "General",
           description: editingSnippet.description || "",
+          folderId: editingSnippet.folderId ?? folderId ?? null,
         });
         // Extract shortcut from trigger if it exists
         const triggerParts = editingSnippet.trigger?.split('-') || [];
@@ -83,13 +84,13 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
           title: "",
           content: "",
           trigger: "",
-          category: "General",
           description: "",
+          folderId: folderId ?? null,
         });
         setShortcut("");
       }
     }
-  }, [isOpen, editingSnippet, form]);
+  }, [isOpen, editingSnippet, form, folderId]);
 
   // Handle keyboard shortcut recording
   const handleShortcutKeyDown = (e: React.KeyboardEvent) => {
@@ -148,10 +149,10 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
       // Ensure trigger is unique
       const timestamp = Date.now();
       const uniqueTrigger = data.trigger ? `${data.trigger}-${timestamp}` : `snippet-${timestamp}`;
-      
       const response = await apiRequest("POST", "/api/snippets", {
         ...data,
         trigger: uniqueTrigger,
+        folderId: folderId ?? data.folderId ?? null,
       });
       
       // Parse the response
@@ -179,7 +180,10 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
 
   const updateMutation = useMutation({
     mutationFn: async (data: InsertSnippet) => {
-      const response = await apiRequest("PUT", `/api/snippets/${editingSnippet!.id}`, data);
+      const response = await apiRequest("PUT", `/api/snippets/${editingSnippet!.id}`, {
+        ...data,
+        folderId: folderId ?? data.folderId ?? null,
+      });
       
       // Parse the response
       const result = await response.json();
@@ -428,39 +432,6 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
               </div>
 
               <div className="grid grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel 
-                        className="text-[13px] font-medium text-gray-300"
-                        style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-                      >
-                        Category
-                      </FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
-                        <FormControl>
-                          <SelectTrigger 
-                            className="rounded-xl text-[14px] border-0 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                            style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-                          >
-                            <SelectValue placeholder="Select category" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent className="bg-gray-800 border-gray-700">
-                          {availableCategories.map(category => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
                 <FormItem>
                   <FormLabel 
                     className="text-[13px] font-medium text-gray-300"

@@ -153,6 +153,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const snippets = await storage.getSnippets(userId);
       res.json(snippets);
     } catch (error) {
+      console.error("[GET /api/snippets]", error);
       res.status(500).json({ message: "Failed to fetch snippets" });
     }
   });
@@ -168,6 +169,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const snippet = await storage.createSnippet(data, userId);
       res.status(201).json(snippet);
     } catch (error) {
+      console.error("[POST /api/snippets]", error);
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
@@ -286,6 +288,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  // Folders routes
+  app.get("/api/folders", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const folders = await storage.getFolders(req.userId!);
+      res.json(folders);
+    } catch (error) {
+      console.error("[GET /api/folders]", error);
+      res.status(500).json({ message: "Failed to fetch folders" });
+    }
+  });
+
+  app.get("/api/folders/:id", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const folder = await storage.getFolder(Number(req.params.id), req.userId!);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      res.json(folder);
+    } catch (error) {
+      console.error("[GET /api/folders/:id]", error);
+      res.status(500).json({ message: "Failed to fetch folder" });
+    }
+  });
+
+  app.post("/api/folders", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ message: "Folder name is required" });
+      const folder = await storage.createFolder(name, req.userId!);
+      res.status(201).json(folder);
+    } catch (error) {
+      console.error("[POST /api/folders]", error);
+      res.status(500).json({ message: "Failed to create folder" });
+    }
+  });
+
+  app.put("/api/folders/:id", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ message: "Folder name is required" });
+      const folder = await storage.updateFolder(Number(req.params.id), name, req.userId!);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      res.json(folder);
+    } catch (error) {
+      console.error("[PUT /api/folders/:id]", error);
+      res.status(500).json({ message: "Failed to update folder" });
+    }
+  });
+
+  app.delete("/api/folders/:id", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const ok = await storage.deleteFolder(Number(req.params.id), req.userId!);
+      if (!ok) return res.status(404).json({ message: "Folder not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[DELETE /api/folders/:id]", error);
+      res.status(500).json({ message: "Failed to delete folder" });
     }
   });
 

@@ -9,32 +9,29 @@ import { useToast } from "@/hooks/use-toast";
 interface FolderCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
+  parentFolder?: string | null;
 }
 
-export default function FolderCreationModal({ isOpen, onClose }: FolderCreationModalProps) {
+export default function FolderCreationModal({ isOpen, onClose, parentFolder }: FolderCreationModalProps) {
   const [folderName, setFolderName] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
+  useEffect(() => {
+    if (isOpen) {
+      setFolderName(parentFolder ? parentFolder + "/" : "");
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isOpen, parentFolder]);
+
   const createFolderMutation = useMutation({
     mutationFn: async (name: string) => {
-      // Create a unique trigger using timestamp to avoid conflicts
-      const timestamp = Date.now();
-      const uniqueTrigger = `folder-${name.toLowerCase().replace(/\s+/g, '-')}-${timestamp}`;
-      
-      // For now, we'll create a dummy snippet with the folder name as category
-      // In a real implementation, you might want to create a separate folders table
-      return await apiRequest("POST", "/api/snippets", {
-        title: `📁 ${name}`,
-        content: `# ${name} Folder\n\nThis folder contains snippets organized in the ${name} category.\n\nTo add snippets to this folder, create a new snippet and select "${name}" as the category.`,
-        trigger: uniqueTrigger,
-        category: name,
-        description: `Folder for organizing ${name} snippets`,
-      });
+      // Use the new folders API
+      return await apiRequest("POST", "/api/folders", { name });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
       toast({
         title: "Folder created",
         description: `"${folderName}" folder has been created successfully.`,
@@ -49,12 +46,6 @@ export default function FolderCreationModal({ isOpen, onClose }: FolderCreationM
       });
     },
   });
-
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 100);
-    }
-  }, [isOpen]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {

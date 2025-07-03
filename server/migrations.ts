@@ -34,19 +34,31 @@ export async function runMigrations() {
 }
 
 async function runSQLiteMigrations() {
-  // Create tables if they don't exist
+  // Create folders table
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS folders (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      parent_id INTEGER,
+      sort_order INTEGER NOT NULL DEFAULT 0
+    )
+  `);
+
+  // Create snippets table with folderId
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS snippets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       trigger TEXT NOT NULL UNIQUE,
-      category TEXT,
       description TEXT,
-      parent_id INTEGER,
+      folder_id INTEGER,
       user_id TEXT NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now'))
+      updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      FOREIGN KEY(folder_id) REFERENCES folders(id)
     )
   `);
 
@@ -77,19 +89,43 @@ async function runSQLiteMigrations() {
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_snippets_trigger ON snippets(trigger)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_user_id ON clipboard_items(user_id)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_created_at ON clipboard_items(created_at)`);
+
+  // Create default General folder and assign all existing snippets
+  const result = await db.get(sql`SELECT id FROM folders WHERE name = 'General'`);
+  let generalFolderId = result?.id;
+  if (!generalFolderId) {
+    const insert = await db.run(sql`INSERT INTO folders (name) VALUES ('General')`);
+    generalFolderId = insert.lastID;
+  }
+  await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id IS NULL`, [generalFolderId]);
+
+  // Add parent_id and sort_order columns to folders if not exist
+  await db.run(sql`ALTER TABLE folders ADD COLUMN IF NOT EXISTS parent_id INTEGER`);
+  await db.run(sql`ALTER TABLE folders ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`);
 }
 
 async function runPostgreSQLMigrations() {
-  // Create tables if they don't exist
+  // Create folders table
+  await db.run(sql`
+    CREATE TABLE IF NOT EXISTS folders (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      parent_id INTEGER REFERENCES folders(id),
+      sort_order INTEGER DEFAULT 0
+    )
+  `);
+
+  // Create snippets table with folderId
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS snippets (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
       trigger TEXT NOT NULL UNIQUE,
-      category TEXT,
       description TEXT,
-      parent_id INTEGER,
+      folder_id INTEGER REFERENCES folders(id),
       user_id TEXT NOT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -123,4 +159,26 @@ async function runPostgreSQLMigrations() {
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_snippets_trigger ON snippets(trigger)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_user_id ON clipboard_items(user_id)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_created_at ON clipboard_items(created_at)`);
+
+  // Create default General folder and assign all existing snippets
+  const result = await db.get(sql`SELECT id FROM folders WHERE name = 'General'`);
+  let generalFolderId = result?.id;
+  if (!generalFolderId) {
+    const insert = await db.run(sql`INSERT INTO folders (name) VALUES ('General') RETURNING id`);
+    generalFolderId = insert.id;
+  }
+  await db.run(sql`UPDATE snippets SET folder_id = $1 WHERE folder_id IS NULL`, [generalFolderId]);
+
+  // Add parent_id and sort_order columns to folders if not exist
+  await db.run(sql`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='folders' AND column_name='parent_id') THEN
+        ALTER TABLE folders ADD COLUMN parent_id INTEGER REFERENCES folders(id);
+      END IF;
+      IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='folders' AND column_name='sort_order') THEN
+        ALTER TABLE folders ADD COLUMN sort_order INTEGER DEFAULT 0;
+      END IF;
+    END$$;
+  `);
 } 

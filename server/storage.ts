@@ -10,7 +10,9 @@ import {
   type ClipboardItem,
   type InsertClipboardItem,
   type Settings,
-  type InsertSettings
+  type InsertSettings,
+  folders,
+  foldersSQLite
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gt } from "drizzle-orm";
@@ -25,12 +27,19 @@ const activeSettings = isSQLite ? settingsSQLite : settings;
 
 export interface IStorage {
   // Snippets
-  getSnippets(userId: string): Promise<Snippet[]>;
+  getSnippets(userId: string, folderId?: number): Promise<Snippet[]>;
   getSnippet(id: number, userId: string): Promise<Snippet | undefined>;
   getSnippetByTrigger(trigger: string, userId: string): Promise<Snippet | undefined>;
   createSnippet(snippet: InsertSnippet, userId: string): Promise<Snippet>;
   updateSnippet(id: number, snippet: Partial<InsertSnippet>, userId: string): Promise<Snippet | undefined>;
   deleteSnippet(id: number, userId: string): Promise<boolean>;
+  
+  // Folders
+  getFolders(userId: string): Promise<any[]>;
+  getFolder(id: number, userId: string): Promise<any | undefined>;
+  createFolder(name: string, userId: string): Promise<any>;
+  updateFolder(id: number, name: string, userId: string, parentId?: number | null, sortOrder?: number): Promise<any | undefined>;
+  deleteFolder(id: number, userId: string): Promise<boolean>;
   
   // Clipboard
   getClipboardItems(userId: string): Promise<ClipboardItem[]>;
@@ -158,10 +167,10 @@ export class FileStorage implements IStorage {
   }
 
   // Snippets
-  async getSnippets(userId: string): Promise<Snippet[]> {
+  async getSnippets(userId: string, folderId?: number): Promise<Snippet[]> {
     const snippets = this.readSnippets();
     return snippets
-      .filter(snippet => snippet.userId === userId)
+      .filter(snippet => snippet.userId === userId && (folderId ? snippet.folderId === folderId : true))
       .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
   }
 
@@ -182,9 +191,8 @@ export class FileStorage implements IStorage {
       ...insertSnippet,
       id: this.currentSnippetId++,
       userId,
-      category: insertSnippet.category || null,
       description: insertSnippet.description || null,
-      parentId: insertSnippet.parentId || null,
+      folderId: typeof insertSnippet.folderId !== 'undefined' ? insertSnippet.folderId : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -198,15 +206,16 @@ export class FileStorage implements IStorage {
     const snippets = this.readSnippets();
     const index = snippets.findIndex(s => s.id === id && s.userId === userId);
     if (index === -1) return undefined;
-    
-    snippets[index] = {
+    const now = new Date();
+    const updated: Snippet = {
       ...snippets[index],
       ...updateData,
-      updatedAt: new Date(),
+      folderId: typeof updateData.folderId !== 'undefined' ? updateData.folderId : snippets[index].folderId ?? null,
+      updatedAt: now,
     };
-    
+    snippets[index] = updated;
     this.writeSnippets(snippets);
-    return snippets[index];
+    return updated;
   }
 
   async deleteSnippet(id: number, userId: string): Promise<boolean> {
@@ -219,6 +228,32 @@ export class FileStorage implements IStorage {
     
     this.writeSnippets(filteredSnippets);
     return true;
+  }
+
+  // Folders
+  async getFolders(userId: string): Promise<any[]> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async getFolder(id: number, userId: string): Promise<any | undefined> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async createFolder(name: string, userId: string): Promise<any> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async updateFolder(id: number, name: string, userId: string): Promise<any | undefined> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async deleteFolder(id: number, userId: string): Promise<boolean> {
+    // Implementation needed
+    throw new Error("Method not implemented");
   }
 
   // Clipboard
@@ -323,9 +358,9 @@ export class MemStorage implements IStorage {
     // No default snippets - users start with a clean slate
   }
 
-  async getSnippets(userId: string): Promise<Snippet[]> {
+  async getSnippets(userId: string, folderId?: number): Promise<Snippet[]> {
     return Array.from(this.snippets.values())
-      .filter(snippet => snippet.userId === userId)
+      .filter(snippet => snippet.userId === userId && (folderId ? snippet.folderId === folderId : true))
       .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
   }
 
@@ -347,9 +382,8 @@ export class MemStorage implements IStorage {
       ...insertSnippet,
       id,
       userId,
-      category: insertSnippet.category || null,
       description: insertSnippet.description || null,
-      parentId: insertSnippet.parentId || null,
+      folderId: typeof insertSnippet.folderId !== 'undefined' ? insertSnippet.folderId : null,
       createdAt: now,
       updatedAt: now,
     };
@@ -363,6 +397,7 @@ export class MemStorage implements IStorage {
     const updated: Snippet = {
       ...existing,
       ...updateData,
+      folderId: typeof updateData.folderId !== 'undefined' ? updateData.folderId : existing.folderId ?? null,
       updatedAt: new Date(),
     };
     this.snippets.set(id, updated);
@@ -375,6 +410,33 @@ export class MemStorage implements IStorage {
     return this.snippets.delete(id);
   }
 
+  // Folders
+  async getFolders(userId: string): Promise<any[]> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async getFolder(id: number, userId: string): Promise<any | undefined> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async createFolder(name: string, userId: string): Promise<any> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async updateFolder(id: number, name: string, userId: string): Promise<any | undefined> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  async deleteFolder(id: number, userId: string): Promise<boolean> {
+    // Implementation needed
+    throw new Error("Method not implemented");
+  }
+
+  // Clipboard
   async getClipboardItems(userId: string): Promise<ClipboardItem[]> {
     return Array.from(this.clipboardItems.values())
       .filter(item => item.userId === userId)
@@ -429,6 +491,7 @@ export class MemStorage implements IStorage {
       .forEach(item => this.clipboardItems.delete(item.id));
   }
 
+  // Settings
   async getSettings(): Promise<Settings> {
     return this.settings;
   }
@@ -441,7 +504,7 @@ export class MemStorage implements IStorage {
 
 export class DatabaseStorage implements IStorage {
   // Snippets
-  async getSnippets(userId: string): Promise<Snippet[]> {
+  async getSnippets(userId: string, folderId?: number): Promise<Snippet[]> {
     if (!db) throw new Error("Database not available");
     return await db.select().from(activeSnippets).where(eq(activeSnippets.userId, userId)).orderBy(desc(activeSnippets.createdAt));
   }
@@ -480,6 +543,51 @@ export class DatabaseStorage implements IStorage {
   async deleteSnippet(id: number, userId: string): Promise<boolean> {
     if (!db) throw new Error("Database not available");
     const result = await db.delete(activeSnippets).where(and(eq(activeSnippets.id, id), eq(activeSnippets.userId, userId)));
+    return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  // Folders
+  async getFolders(userId: string): Promise<any[]> {
+    if (!db) throw new Error("Database not available");
+    const activeFolders = isSQLite ? foldersSQLite : folders;
+    return await db.select().from(activeFolders);
+  }
+
+  async getFolder(id: number, userId: string): Promise<any | undefined> {
+    if (!db) throw new Error("Database not available");
+    const activeFolders = isSQLite ? foldersSQLite : folders;
+    const result = await db.select().from(activeFolders).where(eq(activeFolders.id, id));
+    return result[0];
+  }
+
+  async createFolder(name: string, userId: string): Promise<any> {
+    if (!db) throw new Error("Database not available");
+    const activeFolders = isSQLite ? foldersSQLite : folders;
+    const now = new Date();
+    // Only insert a new folder row, do not update any snippets
+    const [folder] = await db.insert(activeFolders).values({ name, parentId: null, sortOrder: 0, createdAt: now, updatedAt: now }).returning();
+    return folder;
+  }
+
+  async updateFolder(id: number, name: string, userId: string, parentId?: number | null, sortOrder?: number): Promise<any | undefined> {
+    if (!db) throw new Error("Database not available");
+    const activeFolders = isSQLite ? foldersSQLite : folders;
+    const now = new Date();
+    // Allow updating name, parentId, and sortOrder
+    const updateData: any = { name, updatedAt: now };
+    if (typeof parentId !== 'undefined') updateData.parentId = parentId;
+    if (typeof sortOrder !== 'undefined') updateData.sortOrder = sortOrder;
+    const [folder] = await db.update(activeFolders).set(updateData).where(eq(activeFolders.id, id)).returning();
+    return folder;
+  }
+
+  async deleteFolder(id: number, userId: string): Promise<boolean> {
+    if (!db) throw new Error("Database not available");
+    const activeFolders = isSQLite ? foldersSQLite : folders;
+    // Optionally, delete all snippets in this folder
+    const activeSnippets = isSQLite ? snippetsSQLite : snippets;
+    await db.delete(activeSnippets).where(eq(activeSnippets.folderId, id));
+    const result = await db.delete(activeFolders).where(eq(activeFolders.id, id));
     return result.rowCount !== null && result.rowCount > 0;
   }
 

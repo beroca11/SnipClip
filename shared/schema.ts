@@ -5,14 +5,22 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // PostgreSQL schema
+export const folders = pgTable("folders", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull().unique(),
+  parentId: integer("parent_id").references(() => folders.id),
+  sortOrder: integer("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const snippets = pgTable("snippets", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   content: text("content").notNull(),
   trigger: text("trigger").notNull().unique(),
-  category: text("category"),
   description: text("description"),
-  parentId: integer("parent_id"),
+  folderId: integer("folder_id").references(() => folders.id),
   userId: text("user_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -37,14 +45,22 @@ export const settings = pgTable("settings", {
 });
 
 // SQLite schema (for development)
+export const foldersSQLite = sqliteTableCore("folders", {
+  id: integerSQLite("id").primaryKey({ autoIncrement: true }),
+  name: textSQLite("name").notNull().unique(),
+  parentId: integerSQLite("parent_id"),
+  sortOrder: integerSQLite("sort_order").notNull().default(0),
+  createdAt: integerSQLite("created_at").notNull().default(sql`(strftime('%s', 'now'))`),
+  updatedAt: integerSQLite("updated_at").notNull().default(sql`(strftime('%s', 'now'))`),
+});
+
 export const snippetsSQLite = sqliteTableCore("snippets", {
   id: integerSQLite("id").primaryKey({ autoIncrement: true }),
   title: textSQLite("title").notNull(),
   content: textSQLite("content").notNull(),
   trigger: textSQLite("trigger").notNull().unique(),
-  category: textSQLite("category"),
   description: textSQLite("description"),
-  parentId: integerSQLite("parent_id"),
+  folderId: integerSQLite("folder_id"),
   userId: textSQLite("user_id").notNull(),
   createdAt: integerSQLite("created_at").notNull().default(sql`(strftime('%s', 'now'))`),
   updatedAt: integerSQLite("updated_at").notNull().default(sql`(strftime('%s', 'now'))`),
