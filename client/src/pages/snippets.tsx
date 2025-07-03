@@ -49,23 +49,74 @@ function buildFolderTree(folders: { id: number|null, name: string, parentId?: nu
 function FolderTree({ nodes, selectedId, onSelect, onRename, onDelete, onCreateSubfolder }:{ nodes: { id: number|null, name: string, parentId?: number|null, children: any[] }[], selectedId: number|null, onSelect: (id: number|null) => void, onRename: (id: number|null, name: string) => void, onDelete: (id: number|null) => void, onCreateSubfolder: (parentId: number|null) => void }) {
   return (
     <ul className="pl-2">
-      {nodes.map(node => (
-        <li key={node.id ?? 'general'} className="mb-1">
-          <div className={`flex items-center gap-1 cursor-pointer rounded px-2 py-1 ${selectedId === node.id ? 'bg-blue-600 text-white' : 'hover:bg-blue-50 text-gray-700'}`}
-               onClick={() => onSelect(node.id)}>
-            <Folder className="h-4 w-4 mr-1 text-purple-500" />
-            <span className="truncate flex-1">{node.name}</span>
-            <Button size="icon" variant="ghost" className="text-xs text-blue-600 hover:text-blue-800" onClick={e => { e.stopPropagation(); onCreateSubfolder(node.id); }}>
-              <FolderPlus className="h-4 w-4" />
-            </Button>
-            <Button size="icon" variant="ghost" className="text-blue-600" onClick={e => { e.stopPropagation(); onRename(node.id, node.name); }}><Edit className="h-4 w-4" /></Button>
-            <Button size="icon" variant="ghost" className="text-red-600" onClick={e => { e.stopPropagation(); if (window.confirm("Delete this folder and all its snippets?")) onDelete(node.id); }}><Trash2 className="h-4 w-4" /></Button>
-          </div>
-          {node.children && node.children.length > 0 && (
-            <FolderTree nodes={node.children} selectedId={selectedId} onSelect={onSelect} onRename={onRename} onDelete={onDelete} onCreateSubfolder={onCreateSubfolder} />
-          )}
-        </li>
-      ))}
+      {nodes.map(node => {
+        const isGeneralFolder = node.name === "General";
+        const isSelected = selectedId === node.id;
+        
+        return (
+          <li key={node.id ?? 'general'} className="mb-1">
+            <div className={`flex items-center gap-1 cursor-pointer rounded-lg px-3 py-2 transition-all duration-150 ${
+              isSelected 
+                ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md' 
+                : 'hover:bg-blue-50 text-gray-700 hover:text-gray-900'
+            }`}
+                 onClick={() => onSelect(node.id)}>
+              <Folder className={`h-4 w-4 mr-2 ${isGeneralFolder ? 'text-blue-500' : 'text-purple-500'}`} />
+              <span className="truncate flex-1 font-medium">{node.name}</span>
+              
+              {/* Only show action buttons if not General folder */}
+              {!isGeneralFolder && (
+                <>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className={`text-xs ${isSelected ? 'text-white hover:bg-blue-600' : 'text-blue-600 hover:text-blue-800'}`} 
+                    onClick={e => { e.stopPropagation(); onCreateSubfolder(node.id); }}
+                    title="Create subfolder"
+                  >
+                    <FolderPlus className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className={`${isSelected ? 'text-white hover:bg-blue-600' : 'text-blue-600 hover:text-blue-800'}`} 
+                    onClick={e => { e.stopPropagation(); onRename(node.id, node.name); }}
+                    title="Rename folder"
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    size="icon" 
+                    variant="ghost" 
+                    className={`${isSelected ? 'text-white hover:bg-blue-600' : 'text-red-600 hover:text-red-800'}`} 
+                    onClick={e => { 
+                      e.stopPropagation(); 
+                      if (window.confirm(`Delete "${node.name}" folder and move all its snippets to General?`)) {
+                        onDelete(node.id); 
+                      }
+                    }}
+                    title="Delete folder"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+              
+              {/* Show special indicator for General folder */}
+              {isGeneralFolder && (
+                <div className="flex items-center gap-1">
+                  <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                    Default
+                  </span>
+                </div>
+              )}
+            </div>
+            {node.children && node.children.length > 0 && (
+              <FolderTree nodes={node.children} selectedId={selectedId} onSelect={onSelect} onRename={onRename} onDelete={onDelete} onCreateSubfolder={onCreateSubfolder} />
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -254,18 +305,72 @@ export default function SnippetsPage() {
 
   // Fix: wrap deleteFolderMutation.mutate to only call with a number
   const handleDeleteFolder = (id: number|null) => {
-    if (typeof id === 'number') deleteFolderMutation.mutate(id);
+    if (typeof id === 'number') {
+      // Find the folder to be deleted
+      const folderToDelete = folders.find(f => f.id === id);
+      
+      // Protect the General folder from deletion
+      if (folderToDelete && folderToDelete.name === "General") {
+        toast({
+          title: "Cannot delete default folder",
+          description: "The General folder is protected and cannot be deleted.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // For other folders, move their snippets to General before deletion
+      if (folderToDelete) {
+        const generalFolder = folders.find(f => f.name === "General");
+        if (generalFolder) {
+          // Move all snippets from the folder to General
+          const snippetsInFolder = snippets.filter(s => s.folderId === id);
+          Promise.all(
+            snippetsInFolder.map(snippet => 
+              apiRequest("PUT", `/api/snippets/${snippet.id}`, { folderId: generalFolder.id })
+            )
+          ).then(() => {
+            // After moving snippets, delete the folder
+            deleteFolderMutation.mutate(id);
+          }).catch(error => {
+            console.error("Error moving snippets:", error);
+            toast({
+              title: "Error",
+              description: "Failed to move snippets to General folder.",
+              variant: "destructive",
+            });
+          });
+        } else {
+          // If no General folder exists, just delete the folder
+          deleteFolderMutation.mutate(id);
+        }
+      }
+    }
+  };
+
+  // Add protection for renaming General folder
+  const handleRenameFolder = (id: number|null, currentName: string) => {
+    if (currentName === "General") {
+      toast({
+        title: "Cannot rename default folder",
+        description: "The General folder name is protected and cannot be changed.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setRenamingFolderId(id);
+    setRenameValue(currentName);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50" style={{ fontFamily: 'Lato, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-100 via-white to-gray-50" style={{ fontFamily: 'SF Pro Display, SF Pro Icons, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif' }}>
       <div className="p-8 max-w-7xl mx-auto flex flex-row gap-8 items-start">
-        {/* Left Sidebar: Folder Tree */}
+        {/* Sidebar: Glassy, blurred, soft border */}
         <aside className="w-full lg:w-64 flex-shrink-0">
-          <div className="bg-white rounded-2xl shadow-md p-4 sticky top-8">
+          <div className="bg-white/70 backdrop-blur-md border border-gray-200 rounded-2xl shadow-lg p-4 sticky top-8" style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.10)' }}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-bold text-gray-900">Folders</h2>
-              <Button size="icon" variant="ghost" onClick={() => handleCreateFolderWithParent(null)} className="text-blue-600 hover:text-blue-800">
+              <h2 className="text-lg font-semibold text-gray-900 tracking-tight">Folders</h2>
+              <Button size="icon" variant="ghost" onClick={() => handleCreateFolderWithParent(null)} className="text-blue-600 hover:text-blue-800 rounded-full transition-all duration-150">
                 <FolderPlus className="h-5 w-5" />
               </Button>
             </div>
@@ -273,7 +378,7 @@ export default function SnippetsPage() {
               nodes={folderTree}
               selectedId={selectedFolderId}
               onSelect={setSelectedFolderId}
-              onRename={(id, name) => { setRenamingFolderId(id); setRenameValue(name); }}
+              onRename={handleRenameFolder}
               onDelete={handleDeleteFolder}
               onCreateSubfolder={handleCreateFolderWithParent}
             />
@@ -287,7 +392,7 @@ export default function SnippetsPage() {
               <Button
                 variant="ghost"
                 onClick={() => window.history.back()}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 rounded-full px-3 py-1 transition-all duration-150"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back
@@ -300,7 +405,7 @@ export default function SnippetsPage() {
             <div className="flex gap-4">
               <Button
                 onClick={handleNewSnippet}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-xl px-6 py-2 text-base font-semibold transition-all duration-150"
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-lg rounded-full px-6 py-2 text-base font-semibold transition-all duration-150"
                 style={{ boxShadow: '0 4px 16px 0 rgba(37, 99, 235, 0.10)' }}
               >
                 <Plus className="h-5 w-5" />
@@ -311,7 +416,7 @@ export default function SnippetsPage() {
 
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="border-0 shadow-md rounded-2xl bg-white">
+            <Card className="border-0 shadow-md rounded-2xl bg-white/70 backdrop-blur-md">
               <CardContent className="p-6">
                 <div className="flex items-center">
                   <div className="p-3 bg-blue-100 rounded-xl mr-4">
@@ -324,7 +429,7 @@ export default function SnippetsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-md rounded-2xl bg-white">
+            <Card className="border-0 shadow-md rounded-2xl bg-white/70 backdrop-blur-md">
               <CardContent className="p-6">
                 <div className="flex items-center">
                   <div className="p-3 bg-emerald-100 rounded-xl mr-4">
@@ -337,7 +442,7 @@ export default function SnippetsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-md rounded-2xl bg-white">
+            <Card className="border-0 shadow-md rounded-2xl bg-white/70 backdrop-blur-md">
               <CardContent className="p-6">
                 <div className="flex items-center">
                   <div className="p-3 bg-purple-100 rounded-xl mr-4">
@@ -350,7 +455,7 @@ export default function SnippetsPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="border-0 shadow-md rounded-2xl bg-white">
+            <Card className="border-0 shadow-md rounded-2xl bg-white/70 backdrop-blur-md">
               <CardContent className="p-6">
                 <div className="flex items-center">
                   <div className="p-3 bg-orange-100 rounded-xl mr-4">
@@ -366,7 +471,7 @@ export default function SnippetsPage() {
           </div>
 
           {/* Filters and Search */}
-          <Card className="border-0 shadow-md rounded-2xl bg-white mb-6">
+          <Card className="border-0 shadow-md rounded-2xl bg-white/70 backdrop-blur-md mb-6">
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
@@ -391,7 +496,7 @@ export default function SnippetsPage() {
               <p className="text-gray-600 mt-4">Loading snippets...</p>
             </div>
           ) : filteredSnippets.length === 0 ? (
-            <Card className="border-0 shadow-sm">
+            <Card className="border-0 shadow-sm bg-white/70 backdrop-blur-md">
               <CardContent className="p-12 text-center">
                 <Code className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
@@ -400,7 +505,7 @@ export default function SnippetsPage() {
                 <p className="text-gray-600 mb-6">
                   {searchTerm ? "Try adjusting your search" : "Create your first snippet to get started"}
                 </p>
-                <Button onClick={handleNewSnippet} className="flex items-center gap-2">
+                <Button onClick={handleNewSnippet} className="flex items-center gap-2 rounded-full bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 shadow-md transition-all duration-150">
                   <Plus className="h-4 w-4" />
                   Create First Snippet
                 </Button>
@@ -408,10 +513,10 @@ export default function SnippetsPage() {
             </Card>
           ) : (
             <div className="w-full">
-              <div className="bg-white rounded-2xl shadow-md p-4">
+              <div className="bg-white/80 backdrop-blur-md rounded-2xl shadow-lg p-4">
                 <table className="w-full text-sm text-left">
                   <thead>
-                    <tr className="border-b text-gray-700 font-semibold">
+                    <tr className="border-b border-gray-200 text-gray-700 font-semibold">
                       <th className="py-3 px-2 w-1/6">Name</th>
                       <th className="py-3 px-2 w-2/6">Content</th>
                       <th className="py-3 px-2 w-1/6">Folder</th>
@@ -421,23 +526,23 @@ export default function SnippetsPage() {
                   </thead>
                   <tbody>
                     {filteredSnippets.map((snippet) => (
-                      <tr key={snippet.id} className="border-b hover:bg-blue-50 transition group cursor-pointer">
+                      <tr key={snippet.id} className="border-b border-gray-100 hover:bg-blue-50/60 transition group cursor-pointer rounded-xl">
                         <td className="py-2 px-2 font-semibold text-gray-900 truncate max-w-[180px]" title={snippet.title}>{snippet.title}</td>
                         <td className="py-2 px-2 text-gray-700 truncate max-w-[320px]" title={snippet.content}>{snippet.content.length > 60 ? snippet.content.slice(0, 60) + '…' : snippet.content}</td>
                         <td className="py-2 px-2 text-gray-700">{getFolderName(snippet.folderId, folders)}</td>
                         <td className="py-2 px-2 text-gray-500 text-right">{snippet.updatedAt ? new Date(snippet.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "-"}</td>
                         <td className="py-2 px-2 text-right">
                           <div className="flex justify-end gap-2">
-                            <Button size="icon" variant="ghost" title="Copy" onClick={async (e) => { e.stopPropagation(); await copyToClipboard(snippet.content); toast({ title: "Snippet copied", description: `"${snippet.title}" has been copied to clipboard.` }); }} className="h-7 w-7 text-blue-600 hover:text-blue-800">
+                            <Button size="icon" variant="ghost" title="Copy" onClick={async (e) => { e.stopPropagation(); await copyToClipboard(snippet.content); toast({ title: "Snippet copied", description: `\"${snippet.title}\" has been copied to clipboard.` }); }} className="h-7 w-7 text-blue-600 hover:text-blue-800 rounded-full transition-all duration-150">
                               <Copy className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEditSnippet(snippet)} className="h-7 w-7 text-green-600 hover:text-green-800">
+                            <Button size="icon" variant="ghost" title="Edit" onClick={() => handleEditSnippet(snippet)} className="h-7 w-7 text-green-600 hover:text-green-800 rounded-full transition-all duration-150">
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" title="Delete" onClick={() => handleDeleteSnippet(snippet.id)} className="h-7 w-7 text-red-600 hover:text-red-800" disabled={deleteSnippetMutation.isPending}>
+                            <Button size="icon" variant="ghost" title="Delete" onClick={() => handleDeleteSnippet(snippet.id)} className="h-7 w-7 text-red-600 hover:text-red-800 rounded-full transition-all duration-150" disabled={deleteSnippetMutation.isPending}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
-                            <Button size="icon" variant="ghost" title="Move" onClick={() => setMoveSnippetId(snippet.id)} className="h-7 w-7 text-gray-600 hover:text-blue-600">
+                            <Button size="icon" variant="ghost" title="Move" onClick={() => setMoveSnippetId(snippet.id)} className="h-7 w-7 text-gray-600 hover:text-blue-600 rounded-full transition-all duration-150">
                               <Folder className="h-4 w-4" />
                             </Button>
                           </div>

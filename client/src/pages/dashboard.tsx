@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Code, ClipboardList, Keyboard, Settings as SettingsIcon, TrendingUp, Clock, Zap, FolderOpen } from "lucide-react";
+import { Code, ClipboardList, Keyboard, Settings as SettingsIcon, TrendingUp, Clock, Zap, FolderOpen, LogOut } from "lucide-react";
 import SnippetManager from "@/components/snippet-manager";
 import ClipboardHistory from "@/components/clipboard-history";
 import SnippetEditor from "@/components/snippet-editor";
@@ -52,6 +52,15 @@ export default function Dashboard() {
 
   const handleCreateFolder = () => {
     setFolderCreationModalOpen(true);
+  };
+
+  const handleLogout = () => {
+    // Clear localStorage
+    localStorage.removeItem("sessionToken");
+    localStorage.removeItem("userKey");
+    
+    // Reload the page to trigger the login flow
+    window.location.reload();
   };
 
   const getRecentActivity = () => {
@@ -130,6 +139,15 @@ export default function Dashboard() {
               >
                 <SettingsIcon className="w-4 h-4 mr-2" />
                 Settings
+              </Button>
+              <Button
+                onClick={handleLogout}
+                variant="ghost"
+                size="sm"
+                className="text-slate-600 hover:text-red-600 hover:bg-red-50 transition-colors duration-200"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
               </Button>
             </div>
           </div>

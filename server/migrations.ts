@@ -97,6 +97,14 @@ async function runSQLiteMigrations() {
     const insert = await db.run(sql`INSERT INTO folders (name) VALUES ('General')`);
     generalFolderId = insert.lastID;
   }
+  
+  // Move all snippets from non-General folders to General folder
+  await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id IN (SELECT id FROM folders WHERE name != 'General')`, [generalFolderId]);
+  
+  // Remove all non-General folders to ensure clean state
+  await db.run(sql`DELETE FROM folders WHERE name != 'General'`);
+  
+  // Ensure all snippets have a folder (assign to General if null)
   await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id IS NULL`, [generalFolderId]);
 
   // Add parent_id and sort_order columns to folders if not exist
@@ -167,6 +175,14 @@ async function runPostgreSQLMigrations() {
     const insert = await db.run(sql`INSERT INTO folders (name) VALUES ('General') RETURNING id`);
     generalFolderId = insert.id;
   }
+  
+  // Move all snippets from non-General folders to General folder
+  await db.run(sql`UPDATE snippets SET folder_id = $1 WHERE folder_id IN (SELECT id FROM folders WHERE name != 'General')`, [generalFolderId]);
+  
+  // Remove all non-General folders to ensure clean state
+  await db.run(sql`DELETE FROM folders WHERE name != 'General'`);
+  
+  // Ensure all snippets have a folder (assign to General if null)
   await db.run(sql`UPDATE snippets SET folder_id = $1 WHERE folder_id IS NULL`, [generalFolderId]);
 
   // Add parent_id and sort_order columns to folders if not exist

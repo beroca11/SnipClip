@@ -41,28 +41,6 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
     mode: "onChange",
   });
 
-  // Get existing snippets to extract categories
-  const { data: existingSnippets = [] } = useQuery<Snippet[]>({
-    queryKey: ["/api/snippets"],
-  });
-
-  // Extract unique categories from existing snippets
-  const getAvailableCategories = () => {
-    const categories = new Set<string>(["General"]);
-    existingSnippets.forEach(snippet => {
-      if (
-        snippet.category &&
-        !snippet.title.startsWith('📁') &&
-        !(snippet.trigger && snippet.trigger.startsWith('__folder__'))
-      ) {
-        categories.add(snippet.category);
-      }
-    });
-    return Array.from(categories).sort();
-  };
-
-  const availableCategories = getAvailableCategories();
-
   // Reset form when opening/closing or editing different snippet
   useEffect(() => {
     if (isOpen) {
@@ -333,7 +311,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
         onKeyDown={handleKeyDown}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-700">
+        <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-blue-800/30">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-blue-600/20 rounded-xl">
               <Plus className="h-5 w-5 text-blue-400" />
@@ -350,7 +328,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
               variant="ghost"
               size="sm"
               onClick={handleScrollUp}
-              className="h-8 w-8 p-0 rounded-lg hover:bg-gray-700/60 text-gray-400 hover:text-white"
+              className="h-8 w-8 p-0 rounded-lg hover:bg-blue-800/40 text-blue-300 hover:text-white transition-all duration-150"
               title="Scroll Up (Page Up)"
             >
               <ChevronUp className="h-4 w-4" />
@@ -359,7 +337,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
               variant="ghost"
               size="sm"
               onClick={handleScrollDown}
-              className="h-8 w-8 p-0 rounded-lg hover:bg-gray-700/60 text-gray-400 hover:text-white"
+              className="h-8 w-8 p-0 rounded-lg hover:bg-blue-800/40 text-blue-300 hover:text-white transition-all duration-150"
               title="Scroll Down (Page Down)"
             >
               <ChevronDown className="h-4 w-4" />
@@ -368,7 +346,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
               variant="ghost"
               size="sm"
               onClick={handleClose}
-              className="h-8 w-8 p-0 rounded-lg hover:bg-gray-700/60 text-gray-400 hover:text-white"
+              className="h-8 w-8 p-0 rounded-lg hover:bg-blue-800/40 text-blue-300 hover:text-white transition-all duration-150"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -389,7 +367,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel 
-                        className="text-[13px] font-medium text-gray-300"
+                        className="text-[13px] font-medium text-blue-200"
                         style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                       >
                         Title *
@@ -397,7 +375,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
                       <FormControl>
                         <Input 
                           placeholder="Enter snippet title" 
-                          className="rounded-xl text-[14px] border-0 bg-gray-800 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="rounded-xl text-[14px] border-0 bg-blue-900/50 text-white placeholder:text-blue-300/60 focus:ring-2 focus:ring-blue-400 focus:outline-none border border-blue-700/30"
                           style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                           {...field} 
                         />
@@ -413,7 +391,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel 
-                        className="text-[13px] font-medium text-gray-300"
+                        className="text-[13px] font-medium text-blue-200"
                         style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                       >
                         Trigger
@@ -421,7 +399,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
                       <FormControl>
                         <Input 
                           placeholder="e.g., useeffect, cl, arrow" 
-                          className="rounded-xl font-mono text-[14px] border-0 bg-gray-800 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                          className="rounded-xl font-mono text-[14px] border-0 bg-blue-900/50 text-white placeholder:text-blue-300/60 focus:ring-2 focus:ring-blue-400 focus:outline-none border border-blue-700/30"
                           {...field} 
                         />
                       </FormControl>
@@ -434,7 +412,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
               <div className="grid grid-cols-2 gap-6">
                 <FormItem>
                   <FormLabel 
-                    className="text-[13px] font-medium text-gray-300"
+                    className="text-[13px] font-medium text-blue-200"
                     style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                   >
                     Keyboard Shortcut
@@ -445,21 +423,21 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
                       placeholder="Click to record shortcut"
                       value={shortcut}
                       readOnly
-                      className="rounded-xl text-[14px] border-0 bg-gray-800 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono"
+                      className="rounded-xl text-[14px] border-0 bg-blue-900/50 text-white placeholder:text-blue-300/60 focus:ring-2 focus:ring-blue-400 focus:outline-none font-mono border border-blue-700/30"
                       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                     />
                     <Button
                       type="button"
                       variant={isRecordingShortcut ? "destructive" : "outline"}
                       onClick={isRecordingShortcut ? stopRecordingShortcut : startRecordingShortcut}
-                      className="px-4 rounded-xl border-gray-600 text-gray-300 hover:text-white hover:bg-gray-700"
+                      className="px-4 rounded-xl border-blue-600 text-blue-300 hover:text-white hover:bg-blue-700/40 transition-all duration-150"
                       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                     >
                       <Keyboard className="h-4 w-4 mr-2" />
                       {isRecordingShortcut ? "Stop" : "Record"}
                     </Button>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-1">
+                  <p className="text-[11px] text-blue-300/70 mt-1">
                     Press the keys you want to use as a shortcut (e.g., Ctrl+Shift+S)
                   </p>
                 </FormItem>
@@ -471,7 +449,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel 
-                      className="text-[13px] font-medium text-gray-300"
+                      className="text-[13px] font-medium text-blue-200"
                       style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
                     >
                       Content *
@@ -479,7 +457,7 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
                     <FormControl>
                       <Textarea
                         placeholder="Enter your snippet content here..."
-                        className="min-h-[200px] rounded-xl font-mono text-[14px] resize-none border-0 bg-gray-800 text-white placeholder:text-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                        className="min-h-[200px] rounded-xl font-mono text-[14px] resize-none border-0 bg-blue-900/50 text-white placeholder:text-blue-300/60 focus:ring-2 focus:ring-blue-400 focus:outline-none border border-blue-700/30"
                         {...field}
                       />
                     </FormControl>
@@ -493,24 +471,24 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreat
           </Form>
         </div>
         {/* Sticky Footer for Actions */}
-        <div className="sticky-footer-actions px-6 py-4 border-t border-gray-700 bg-[#181A20] flex items-center justify-between" style={{ position: 'sticky', bottom: 0, zIndex: 10 }}>
+        <div className="sticky-footer-actions px-6 py-4 border-t border-blue-800/30 bg-gradient-to-r from-blue-900/80 to-blue-800/80 flex items-center justify-between" style={{ position: 'sticky', bottom: 0, zIndex: 10 }}>
           <Button
             type="button"
             variant="ghost"
             onClick={handleClose}
-            className="flex items-center gap-2 text-[13px] font-medium text-gray-400 hover:text-white hover:bg-gray-700/60 rounded-xl px-4 py-2"
+            className="flex items-center gap-2 text-[13px] font-medium text-blue-300 hover:text-white hover:bg-blue-700/40 rounded-xl px-4 py-2 transition-all duration-150"
             style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
           >
             <X className="h-4 w-4" />
             Cancel
           </Button>
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-gray-500 font-mono">⌘+Enter to save • Page Up/Down to scroll</span>
+            <span className="text-[11px] text-blue-300/60 font-mono">⌘+Enter to save • Page Up/Down to scroll</span>
             <Button
               type="button"
               onClick={handleManualSave}
               disabled={isSaving}
-              className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white rounded-xl px-4 py-2 text-[13px] font-medium"
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl px-4 py-2 text-[13px] font-medium shadow-lg transition-all duration-150"
               style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
             >
               <Save className="h-4 w-4" />
