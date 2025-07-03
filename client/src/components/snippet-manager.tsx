@@ -120,20 +120,36 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
     setSelectedIndex(0);
   }, [searchTerm]);
 
+  // Ensure selectedIndex doesn't go out of bounds
+  useEffect(() => {
+    const snippetItems = filteredItems.filter(item => item.type === 'snippet');
+    if (selectedIndex >= snippetItems.length && snippetItems.length > 0) {
+      setSelectedIndex(snippetItems.length - 1);
+    }
+  }, [filteredItems, selectedIndex]);
+
   // Scroll selected item into view
   useEffect(() => {
-    if (filteredItems[selectedIndex]) {
-      listRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const snippetItems = filteredItems.filter(item => item.type === 'snippet');
+    if (snippetItems[selectedIndex]) {
+      // Find the selected list item and scroll it into view
+      const listContainer = document.querySelector('.snippet-list-container');
+      const selectedItem = listContainer?.children[selectedIndex] as HTMLElement;
+      if (selectedItem) {
+        selectedItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
     }
-  }, [selectedIndex, filteredItems.length]);
+  }, [selectedIndex, filteredItems]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) return;
     
+    const snippetItems = filteredItems.filter(item => item.type === 'snippet').map(item => item.data);
+    
     switch (e.key) {
       case "ArrowDown":
         e.preventDefault();
-        setSelectedIndex(prev => Math.min(prev + 1, filteredItems.length - 1));
+        setSelectedIndex(prev => Math.min(prev + 1, snippetItems.length - 1));
         break;
       case "ArrowUp":
         e.preventDefault();
@@ -141,11 +157,8 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
         break;
       case "Enter":
         e.preventDefault();
-        if (filteredItems[selectedIndex]) {
-          const item = filteredItems[selectedIndex];
-          if (item.type === 'snippet') {
-            handleSelectSnippet(item.data);
-          }
+        if (snippetItems[selectedIndex]) {
+          handleSelectSnippet(snippetItems[selectedIndex]);
         }
         break;
       case "Escape":
@@ -267,7 +280,7 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
 
         {/* List */}
         <div
-          className={`max-h-96 overflow-y-auto ${customScrollbar} px-2`}
+          className={`max-h-96 overflow-y-auto ${customScrollbar} px-2 snippet-list-container`}
         >
           {isLoading ? (
             <div className="text-center py-12">
@@ -295,29 +308,20 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
                           }}
               onEdit={onEditSnippet}
               onDelete={(id) => deleteSnippetMutation.mutate(id)}
+              selectedIndex={selectedIndex}
+              setSelectedIndex={setSelectedIndex}
             />
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-slate-900/50 to-slate-800/50 border-t border-slate-700/50">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              onClick={onNewSnippet}
-              className="flex items-center gap-2 text-sm font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/20 rounded-lg px-3 py-2"
-              style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-            >
-              <Plus className="h-4 w-4" />
-              New Snippet
-            </Button>
-            <div className="flex items-center gap-3 text-sm text-slate-500" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}>
-              <span>Use ↑↓ to navigate</span>
-              <span>•</span>
-              <span>Enter to copy</span>
-              <span>•</span>
-              <span>Esc to close</span>
-            </div>
+        <div className="flex items-center justify-center px-6 py-4 bg-gradient-to-r from-slate-900/50 to-slate-800/50 border-t border-slate-700/50">
+          <div className="flex items-center gap-3 text-sm text-slate-500" style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}>
+            <span>Use ↑↓ to navigate</span>
+            <span>•</span>
+            <span>Enter to copy</span>
+            <span>•</span>
+            <span>Esc to close</span>
           </div>
         </div>
       </div>

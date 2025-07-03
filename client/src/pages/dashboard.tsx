@@ -4,12 +4,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Code, ClipboardList, Keyboard, Settings as SettingsIcon, TrendingUp, Clock, Zap, FolderOpen, LogOut, Folder } from "lucide-react";
+import { Code, ClipboardList, Keyboard, Settings as SettingsIcon, TrendingUp, Clock, Zap, FolderOpen, LogOut } from "lucide-react";
 import SnippetManager from "@/components/snippet-manager";
 import ClipboardHistory from "@/components/clipboard-history";
 import SnippetEditor from "@/components/snippet-editor";
 import SettingsModal from "@/components/settings-modal";
-import FolderCreationModal from "@/components/folder-creation-modal";
+
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useClipboardMonitor } from "@/hooks/use-clipboard-monitor";
 import { apiRequest } from "@/lib/queryClient";
@@ -21,7 +21,7 @@ export default function Dashboard() {
   console.log('Dashboard rendered', dashboardInstance);
   const [snippetEditorOpen, setSnippetEditorOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
-  const [folderCreationModalOpen, setFolderCreationModalOpen] = useState(false);
+
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
 
   const { data: snippets = [] } = useQuery<Snippet[]>({
@@ -36,13 +36,7 @@ export default function Dashboard() {
     queryKey: ["/api/settings"],
   });
 
-  const { data: folders = [] } = useQuery<any[]>({
-    queryKey: ["/api/folders"],
-    queryFn: async () => {
-      const res = await apiRequest("GET", "/api/folders");
-      return res.json();
-    },
-  });
+
 
   // Initialize new snippet keyboard shortcuts
   useKeyboardShortcuts();
@@ -60,9 +54,7 @@ export default function Dashboard() {
     setSnippetEditorOpen(true);
   };
 
-  const handleCreateFolder = () => {
-    setFolderCreationModalOpen(true);
-  };
+
 
   const handleLogout = () => {
     // Clear localStorage
@@ -141,35 +133,6 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center space-x-3">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-600">Quick Folder:</span>
-                <Select
-                  onValueChange={(value) => {
-                    if (value) {
-                      window.location.href = `/snippets?folder=${value}`;
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-40 bg-white border border-slate-200 rounded-lg shadow-sm">
-                    <SelectValue placeholder="Go to folder..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {folders.map((folder) => (
-                      <SelectItem key={folder.id} value={folder.id.toString()}>
-                        <div className="flex items-center gap-2">
-                          <Folder className="h-4 w-4 text-purple-500" />
-                          {folder.name}
-                          {folder.name === "General" && (
-                            <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                              Default
-                            </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <Button
                 onClick={() => setSettingsModalOpen(true)}
                 variant="ghost"
@@ -433,10 +396,7 @@ export default function Dashboard() {
         onClose={() => setSettingsModalOpen(false)}
       />
 
-      <FolderCreationModal
-        isOpen={folderCreationModalOpen}
-        onClose={() => setFolderCreationModalOpen(false)}
-      />
+
     </div>
   );
 }
