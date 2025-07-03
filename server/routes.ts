@@ -173,6 +173,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
       }
+      // Check if it's a folder validation error
+      if (error instanceof Error && error.message.includes("Folder with ID") && error.message.includes("does not exist")) {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to create snippet" });
     }
   });
@@ -196,6 +200,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: "Validation error", errors: error.errors });
+      }
+      // Check if it's a folder validation error
+      if (error instanceof Error && error.message.includes("Folder with ID") && error.message.includes("does not exist")) {
+        return res.status(400).json({ message: error.message });
       }
       res.status(500).json({ message: "Failed to update snippet" });
     }
@@ -294,6 +302,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Folders routes
   app.get("/api/folders", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
+      // Ensure General folder exists for the user
+      await storage.ensureGeneralFolder(req.userId!);
+      
       const folders = await storage.getFolders(req.userId!);
       res.json(folders);
     } catch (error) {
@@ -317,10 +328,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name } = req.body;
       if (!name) return res.status(400).json({ message: "Folder name is required" });
+      
+      // Prevent creation of "General" folder as it's reserved
+      if (name.toLowerCase() === "general") {
+        return res.status(400).json({ message: "Cannot create folder named 'General' as it's a reserved name" });
+      }
+      
       const folder = await storage.createFolder(name, req.userId!);
       res.status(201).json(folder);
     } catch (error) {
       console.error("[POST /api/folders]", error);
+      if (error instanceof Error && error.message.includes("Folder name already exists")) {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to create folder" });
     }
   });
@@ -329,18 +349,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { name } = req.body;
       if (!name) return res.status(400).json({ message: "Folder name is required" });
+      
+      // Prevent renaming to "General" as it's reserved
+      if (name.toLowerCase() === "general") {
+        return res.status(400).json({ message: "Cannot rename folder to 'General' as it's a reserved name" });
+      }
+      
       const folder = await storage.updateFolder(Number(req.params.id), name, req.userId!);
       if (!folder) return res.status(404).json({ message: "Folder not found" });
       res.json(folder);
     } catch (error) {
       console.error("[PUT /api/folders/:id]", error);
+      if (error instanceof Error && error.message.includes("Folder name already exists")) {
+        return res.status(400).json({ message: error.message });
+      }
       res.status(500).json({ message: "Failed to update folder" });
+    }
+  });
+
+  // Specific rename endpoint for better UX
+  app.patch("/api/folders/:id/rename", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { name } = req.body;
+      if (!name) return res.status(400).json({ message: "Folder name is required" });
+      
+      // Prevent renaming to "General" as it's reserved
+      if (name.toLowerCase() === "general") {
+        return res.status(400).json({ message: "Cannot rename folder to 'General' as it's a reserved name" });
+      }
+      
+      const folder = await storage.updateFolder(Number(req.params.id), name, req.userId!);
+      if (!folder) return res.status(404).json({ message: "Folder not found" });
+      res.json(folder);
+    } catch (error) {
+      console.error("[PATCH /api/folders/:id/rename]", error);
+      if (error instanceof Error && error.message.includes("Folder name already exists")) {
+        return res.status(400).json({ message: error.message });
+      }
+      res.status(500).json({ message: "Failed to rename folder" });
     }
   });
 
   app.delete("/api/folders/:id", authenticateUserMiddleware, async (req: AuthenticatedRequest, res) => {
     try {
-      const ok = await storage.deleteFolder(Number(req.params.id), req.userId!);
+      const folderId = Number(req.params.id);
+      
+      // Get the folder to check if it's the General folder
+      const folder = await storage.getFolder(folderId, req.userId!);
+      if (folder && folder.name === "General") {
+        return res.status(400).json({ message: "Cannot delete the 'General' folder as it's a reserved system folder" });
+      }
+      
+      const ok = await storage.deleteFolder(folderId, req.userId!);
       if (!ok) return res.status(404).json({ message: "Folder not found" });
       res.json({ success: true });
     } catch (error) {

@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
 import SnippetEditor from "@/components/snippet-editor";
 import FolderCreationModal from "@/components/folder-creation-modal";
+import FolderRenameModal from "@/components/folder-rename-modal";
 import type { Snippet } from "@shared/schema";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -104,10 +105,11 @@ export default function SnippetsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [snippetEditorOpen, setSnippetEditorOpen] = useState(false);
   const [folderCreationModalOpen, setFolderCreationModalOpen] = useState(false);
+  const [folderRenameModalOpen, setFolderRenameModalOpen] = useState(false);
   const [editingSnippet, setEditingSnippet] = useState<Snippet | null>(null);
   const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
   const [renamingFolderId, setRenamingFolderId] = useState<number | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+  const [renamingFolderName, setRenamingFolderName] = useState("");
   const [deletingFolderId, setDeletingFolderId] = useState<number | null>(null);
   const [moveSnippetId, setMoveSnippetId] = useState<number | null>(null);
   const [moveTargetFolderId, setMoveTargetFolderId] = useState<number | null>(null);
@@ -160,17 +162,6 @@ export default function SnippetsPage() {
   });
 
   // Folder mutations
-  const renameFolderMutation = useMutation({
-    mutationFn: async ({ id, name }: { id: number; name: string }) => {
-      const res = await apiRequest("PUT", `/api/folders/${id}`, { name });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/folders"] });
-      setRenamingFolderId(null);
-      setRenameValue("");
-    },
-  });
   const deleteFolderMutation = useMutation({
     mutationFn: async (id: number) => {
       await apiRequest("DELETE", `/api/folders/${id}`);
@@ -329,7 +320,8 @@ export default function SnippetsPage() {
       return;
     }
     setRenamingFolderId(id);
-    setRenameValue(currentName);
+    setRenamingFolderName(currentName);
+    setFolderRenameModalOpen(true);
   };
 
   return (
@@ -560,6 +552,16 @@ export default function SnippetsPage() {
       <FolderCreationModal
         isOpen={folderCreationModalOpen}
         onClose={() => setFolderCreationModalOpen(false)}
+      />
+      <FolderRenameModal
+        isOpen={folderRenameModalOpen}
+        onClose={() => {
+          setFolderRenameModalOpen(false);
+          setRenamingFolderId(null);
+          setRenamingFolderName("");
+        }}
+        folderId={renamingFolderId}
+        currentName={renamingFolderName}
       />
       
       {/* Move Snippet Modal */}

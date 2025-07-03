@@ -40,6 +40,7 @@ export interface IStorage {
   createFolder(name: string, userId: string): Promise<any>;
   updateFolder(id: number, name: string, userId: string, sortOrder?: number): Promise<any | undefined>;
   deleteFolder(id: number, userId: string): Promise<boolean>;
+  ensureGeneralFolder(userId: string): Promise<any>;
   
   // Clipboard
   getClipboardItems(userId: string): Promise<ClipboardItem[]>;
@@ -209,6 +210,14 @@ export class FileStorage implements IStorage {
   }
 
   async createSnippet(insertSnippet: InsertSnippet, userId: string): Promise<Snippet> {
+    // Validate that the folder exists if folderId is provided
+    if (insertSnippet.folderId) {
+      const folder = await this.getFolder(insertSnippet.folderId, userId);
+      if (!folder) {
+        throw new Error(`Cannot create snippet: Folder with ID ${insertSnippet.folderId} does not exist. Please select a valid folder or create the folder first.`);
+      }
+    }
+    
     const snippets = this.readSnippets();
     const now = new Date();
     const snippet: Snippet = {
@@ -227,6 +236,14 @@ export class FileStorage implements IStorage {
   }
 
   async updateSnippet(id: number, updateData: Partial<InsertSnippet>, userId: string): Promise<Snippet | undefined> {
+    // Validate that the folder exists if folderId is being updated
+    if (updateData.folderId) {
+      const folder = await this.getFolder(updateData.folderId, userId);
+      if (!folder) {
+        throw new Error(`Cannot update snippet: Folder with ID ${updateData.folderId} does not exist. Please select a valid folder or create the folder first.`);
+      }
+    }
+    
     const snippets = this.readSnippets();
     const index = snippets.findIndex(s => s.id === id && s.userId === userId);
     if (index === -1) return undefined;
@@ -338,6 +355,31 @@ export class FileStorage implements IStorage {
     this.writeFolders(folders);
     
     return true;
+  }
+
+  async ensureGeneralFolder(userId: string): Promise<any> {
+    const folders = this.readFolders();
+    
+    // Check if General folder already exists for this user
+    const existingFolder = folders.find(folder => folder.name === "General" && folder.userId === userId);
+    if (existingFolder) {
+      return existingFolder;
+    }
+    
+    // Create General folder if it doesn't exist
+    const now = new Date();
+    const generalFolder = {
+      id: this.currentFolderId++,
+      name: "General",
+      userId,
+      sortOrder: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    folders.push(generalFolder);
+    this.writeFolders(folders);
+    return generalFolder;
   }
 
   // Clipboard
@@ -464,6 +506,14 @@ export class MemStorage implements IStorage {
   }
 
   async createSnippet(insertSnippet: InsertSnippet, userId: string): Promise<Snippet> {
+    // Validate that the folder exists if folderId is provided
+    if (insertSnippet.folderId) {
+      const folder = await this.getFolder(insertSnippet.folderId, userId);
+      if (!folder) {
+        throw new Error(`Cannot create snippet: Folder with ID ${insertSnippet.folderId} does not exist. Please select a valid folder or create the folder first.`);
+      }
+    }
+    
     const id = this.currentSnippetId++;
     const now = new Date();
     const snippet: Snippet = {
@@ -480,6 +530,14 @@ export class MemStorage implements IStorage {
   }
 
   async updateSnippet(id: number, updateData: Partial<InsertSnippet>, userId: string): Promise<Snippet | undefined> {
+    // Validate that the folder exists if folderId is being updated
+    if (updateData.folderId) {
+      const folder = await this.getFolder(updateData.folderId, userId);
+      if (!folder) {
+        throw new Error(`Cannot update snippet: Folder with ID ${updateData.folderId} does not exist. Please select a valid folder or create the folder first.`);
+      }
+    }
+    
     const existing = this.snippets.get(id);
     if (!existing || existing.userId !== userId) return undefined;
     const updated: Snippet = {
@@ -573,6 +631,30 @@ export class MemStorage implements IStorage {
     return this.folders.delete(id);
   }
 
+  async ensureGeneralFolder(userId: string): Promise<any> {
+    // Check if General folder already exists for this user
+    const existingFolder = Array.from(this.folders.values())
+      .find(folder => folder.name === "General" && folder.userId === userId);
+    
+    if (existingFolder) {
+      return existingFolder;
+    }
+    
+    // Create General folder if it doesn't exist
+    const now = new Date();
+    const generalFolder = {
+      id: this.currentFolderId++,
+      name: "General",
+      userId,
+      sortOrder: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    
+    this.folders.set(generalFolder.id, generalFolder);
+    return generalFolder;
+  }
+
   // Clipboard
   async getClipboardItems(userId: string): Promise<ClipboardItem[]> {
     return Array.from(this.clipboardItems.values())
@@ -660,6 +742,15 @@ export class DatabaseStorage implements IStorage {
 
   async createSnippet(snippet: InsertSnippet, userId: string): Promise<Snippet> {
     if (!db) throw new Error("Database not available");
+    
+    // Validate that the folder exists if folderId is provided
+    if (snippet.folderId) {
+      const folder = await this.getFolder(snippet.folderId, userId);
+      if (!folder) {
+        throw new Error(`Cannot create snippet: Folder with ID ${snippet.folderId} does not exist. Please select a valid folder or create the folder first.`);
+      }
+    }
+    
     const [newSnippet] = await db.insert(activeSnippets).values({
       ...snippet,
       userId,
@@ -670,6 +761,15 @@ export class DatabaseStorage implements IStorage {
 
   async updateSnippet(id: number, updateData: Partial<InsertSnippet>, userId: string): Promise<Snippet | undefined> {
     if (!db) throw new Error("Database not available");
+    
+    // Validate that the folder exists if folderId is being updated
+    if (updateData.folderId) {
+      const folder = await this.getFolder(updateData.folderId, userId);
+      if (!folder) {
+        throw new Error(`Cannot update snippet: Folder with ID ${updateData.folderId} does not exist. Please select a valid folder or create the folder first.`);
+      }
+    }
+    
     const [updated] = await db.update(activeSnippets)
       .set({ ...updateData, updatedAt: new Date() })
       .where(and(eq(activeSnippets.id, id), eq(activeSnippets.userId, userId)))
@@ -740,6 +840,32 @@ export class DatabaseStorage implements IStorage {
     const result = await db.delete(activeFolders)
       .where(and(eq(activeFolders.id, id), eq(activeFolders.userId, userId)));
     return result.rowCount !== null && result.rowCount > 0;
+  }
+
+  async ensureGeneralFolder(userId: string): Promise<any> {
+    if (!db) throw new Error("Database not available");
+    const activeFolders = isSQLite ? foldersSQLite : folders;
+    
+    // Check if General folder already exists for this user
+    const [existingFolder] = await db.select()
+      .from(activeFolders)
+      .where(and(eq(activeFolders.name, "General"), eq(activeFolders.userId, userId)));
+    
+    if (existingFolder) {
+      return existingFolder;
+    }
+    
+    // Create General folder if it doesn't exist
+    const now = new Date();
+    const [generalFolder] = await db.insert(activeFolders).values({
+      name: "General",
+      userId,
+      sortOrder: 0,
+      createdAt: now,
+      updatedAt: now
+    }).returning();
+    
+    return generalFolder;
   }
 
   // Clipboard
