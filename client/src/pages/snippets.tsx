@@ -266,7 +266,7 @@ export default function SnippetsPage() {
           </CardContent>
         </Card>
 
-        {/* Snippets Grid */}
+        {/* Snippets List/Table */}
         {isLoading ? (
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
@@ -292,90 +292,71 @@ export default function SnippetsPage() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredSnippets.map((snippet) => {
-              const Icon = getCategoryIcon(snippet.category || 'General');
-              const hasShortcut = snippet.trigger && snippet.trigger.includes('-');
-              const shortcut = hasShortcut ? snippet.trigger.split('-')[0] : null;
-              
-              return (
-                <Card key={snippet.id} className="border-0 shadow-sm hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`p-2 rounded-lg ${getCategoryColor(snippet.category || 'General')}`}>
-                          <Icon className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <CardTitle className="text-lg truncate">{snippet.title}</CardTitle>
-                          <Badge variant="secondary" className="mt-1">
-                            {snippet.category || "General"}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleSelectSnippet(snippet)}
-                          className="h-8 w-8"
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleEditSnippet(snippet)}
-                          className="h-8 w-8"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => handleDeleteSnippet(snippet.id)}
-                          className="h-8 w-8 text-red-600 hover:text-red-700"
-                          disabled={deleteSnippetMutation.isPending}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      {snippet.description && (
-                        <p className="text-sm text-gray-600 line-clamp-2">
-                          {snippet.description}
-                        </p>
-                      )}
-                      <div className="bg-gray-50 rounded-lg p-3">
-                        <pre className="text-sm text-gray-700 font-mono line-clamp-3 overflow-hidden">
-                          {snippet.content}
-                        </pre>
-                      </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500">
-                        <div className="flex items-center gap-2">
-                          {hasShortcut ? (
-                            <div className="flex items-center gap-1">
-                              <Keyboard className="h-3 w-3" />
-                              <kbd className="px-1.5 py-0.5 bg-gray-200 border border-gray-300 rounded font-mono">
-                                {shortcut}
-                              </kbd>
-                            </div>
-                          ) : (
-                            <span className="font-mono">{snippet.trigger}</span>
-                          )}
-                        </div>
-                        <span>
-                          {new Date(snippet.updatedAt).toLocaleDateString()}
-                        </span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="w-full">
+            <div className="grid grid-cols-12 gap-4 px-4 py-2 border-b border-gray-300 bg-gray-100 sticky top-0 z-10 rounded-t-xl">
+              <div className="col-span-3 font-bold text-lg text-gray-900">Name</div>
+              <div className="col-span-5 font-bold text-lg text-gray-900">Content</div>
+              <div className="col-span-2 font-bold text-lg text-gray-900 text-right">Date Modified</div>
+              <div className="col-span-2 font-bold text-lg text-gray-900 text-right">Actions</div>
+            </div>
+            <div>
+              {filteredSnippets.map((snippet) => (
+                <div
+                  key={snippet.id}
+                  className="grid grid-cols-12 gap-4 items-center px-4 py-4 border-b border-gray-200 hover:bg-blue-100/60 transition-all text-[17px] font-sans cursor-pointer group"
+                  style={{ fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif', fontSize: 17 }}
+                  onClick={async () => {
+                    await copyToClipboard(snippet.content);
+                    toast({
+                      title: "Snippet copied",
+                      description: `\"${snippet.title}\" has been copied to clipboard.`,
+                    });
+                  }}
+                >
+                  <div className="col-span-3 font-semibold text-gray-900 truncate text-lg group-hover:underline">{snippet.title}</div>
+                  <div className="col-span-5 text-gray-700 truncate text-base" title={snippet.content} style={{maxWidth: '100%'}}>
+                    {snippet.content.length > 80 ? snippet.content.slice(0, 80) + '…' : snippet.content}
+                  </div>
+                  <div className="col-span-2 text-gray-500 text-right text-base">
+                    {snippet.updatedAt ? new Date(snippet.updatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : "-"}
+                  </div>
+                  <div className="col-span-2 flex justify-end gap-2" onClick={e => e.stopPropagation()}>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        await copyToClipboard(snippet.content);
+                        toast({
+                          title: "Snippet copied",
+                          description: `\"${snippet.title}\" has been copied to clipboard.`,
+                        });
+                      }}
+                      className="h-8 w-8 text-blue-600 hover:text-blue-800"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleEditSnippet(snippet)}
+                      className="h-8 w-8 text-green-600 hover:text-green-800"
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeleteSnippet(snippet.id)}
+                      className="h-8 w-8 text-red-600 hover:text-red-800"
+                      disabled={deleteSnippetMutation.isPending}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -388,6 +369,13 @@ export default function SnippetsPage() {
           setEditingSnippet(null);
         }}
         editingSnippet={editingSnippet}
+        onCreate={async (snippet) => {
+          await copyToClipboard(snippet.content);
+          toast({
+            title: "Snippet copied",
+            description: `\"${snippet.title}\" has been copied to clipboard.`,
+          });
+        }}
       />
 
       <FolderCreationModal

@@ -61,8 +61,16 @@ function App() {
         setSnippetModalOpen(true);
       }
     };
+    const openSnippetListener = () => setSnippetModalOpen(true);
+    const openClipboardListener = () => setClipboardModalOpen(true);
     window.addEventListener("keydown", handleGlobalShortcut);
-    return () => window.removeEventListener("keydown", handleGlobalShortcut);
+    window.addEventListener("open-snippet-overlay", openSnippetListener);
+    window.addEventListener("open-clipboard-overlay", openClipboardListener);
+    return () => {
+      window.removeEventListener("keydown", handleGlobalShortcut);
+      window.removeEventListener("open-snippet-overlay", openSnippetListener);
+      window.removeEventListener("open-clipboard-overlay", openClipboardListener);
+    };
   }, []);
 
   const handleLoginSuccess = (newUserId: string, sessionToken: string) => {

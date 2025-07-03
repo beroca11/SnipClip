@@ -13,6 +13,8 @@ import {
   authenticateUser,
   type UserCredentials 
 } from "./auth";
+import fs from "fs";
+import path from "path";
 
 // Extend Request interface to include userId
 interface AuthenticatedRequest extends Request {

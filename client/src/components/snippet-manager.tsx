@@ -8,6 +8,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { copyToClipboard } from "@/lib/clipboard";
 import type { Snippet } from "@shared/schema";
+import SnippetList from "./SnippetList";
 
 interface SnippetManagerProps {
   isOpen: boolean;
@@ -20,11 +21,12 @@ interface SnippetManagerProps {
 const customScrollbar = `clipboard-scrollbar`;
 
 export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSnippet }: SnippetManagerProps) {
+  const overlayInstance = Math.random().toString(36).slice(2, 8);
+  console.log('SnippetManager rendered', overlayInstance);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
-  const itemRefs = useRef<(HTMLLIElement | null)[]>([]);
   const { toast } = useToast();
 
   const { data: snippets = [], isLoading } = useQuery<Snippet[]>({
@@ -121,8 +123,8 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
 
   // Scroll selected item into view
   useEffect(() => {
-    if (itemRefs.current[selectedIndex]) {
-      itemRefs.current[selectedIndex]?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    if (filteredItems[selectedIndex]) {
+      listRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   }, [selectedIndex, filteredItems.length]);
 
@@ -214,35 +216,34 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
 
   return (
     <div 
-      className="overlay-backdrop"
+      className="overlay-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur"
       onClick={(e) => {
-        // Close when clicking on the backdrop
         if (e.target === e.currentTarget) {
           onClose();
         }
       }}
     >
       <div
-        className="w-full max-w-3xl mx-4 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 border border-slate-700/50 shadow-2xl overflow-hidden backdrop-blur-xl"
-        style={{ minHeight: 600 }}
+        className="w-full max-w-3xl mx-4 rounded-2xl bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 border border-blue-700/60 shadow-2xl overflow-hidden backdrop-blur-xl scale-100 animate-scale-in"
+        style={{ minHeight: 600, fontFamily: 'Inter, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, Helvetica, Arial, sans-serif', fontSize: 18 }}
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside the content
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header with gradient */}
-        <div className="bg-gradient-to-r from-emerald-600/20 via-blue-600/20 to-purple-600/20 border-b border-slate-700/50">
+        <div className="bg-gradient-to-r from-blue-700/40 via-indigo-700/30 to-slate-800/40 border-b border-blue-800/40">
           <div className="flex items-center justify-between px-6 py-4">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-500/20 rounded-xl backdrop-blur-sm">
-                <Code className="h-5 w-5 text-emerald-400" />
+              <div className="p-2 bg-blue-500/30 rounded-xl backdrop-blur-sm">
+                <Code className="h-6 w-6 text-blue-300" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-white">Snippet Manager</h2>
-                <p className="text-sm text-slate-400">Organize and access your code snippets</p>
+                <h2 className="text-2xl font-bold text-white tracking-tight">Snippet Manager</h2>
+                <p className="text-base text-blue-200">Organize and access your code snippets</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 bg-slate-800/50 px-2 py-1 rounded-md font-mono">
+              <span className="text-sm text-blue-200 bg-blue-800/40 px-3 py-1 rounded-md font-mono">
                 {totalSnippets} snippets
               </span>
             </div>
@@ -282,115 +283,20 @@ export default function SnippetManager({ isOpen, onClose, onEditSnippet, onNewSn
               <div className="text-slate-500 text-xs">Create your first snippet to get started</div>
             </div>
           ) : (
-            <ul ref={listRef} className="space-y-1">
-              {filteredItems.map((item, index) => {
-                if (item.type === 'category') {
-                  const { name, count } = item.data;
-                  return (
-                    <li
-                      key={`category-${name}`}
-                      ref={el => (itemRefs.current[index] = el)}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-xl cursor-default transition-all duration-200 ${
-                        index === selectedIndex
-                          ? "bg-gradient-to-r from-slate-700/50 to-slate-600/50 border border-slate-600/50 shadow-lg"
-                          : "text-slate-300"
-                      }`}
-                      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-                    >
-                      <div className="flex-shrink-0 w-8 h-8 bg-slate-700/50 rounded-lg flex items-center justify-center">
-                        <Folder className="h-4 w-4 text-slate-400" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate font-semibold text-white text-sm leading-5">
-                          {name}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="text-xs text-slate-400">{count} snippet{count !== 1 ? 's' : ''}</span>
-                        </div>
-                      </div>
-                    </li>
-                  );
-                } else {
-                  const snippet = item.data as Snippet;
-                  const contentType = getCategoryColor(snippet.category || 'General');
-                  const Icon = getCategoryIcon(snippet.category || 'General');
-                  return (
-                    <li
-                      key={snippet.id}
-                      ref={el => (itemRefs.current[index] = el)}
-                      className={`group flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all duration-200 ${
-                        index === selectedIndex
-                          ? "bg-gradient-to-r from-emerald-600/20 to-blue-600/20 border border-emerald-500/30 shadow-lg"
-                          : "hover:bg-slate-800/50 border border-transparent"
-                      }`}
-                      onClick={() => handleSelectSnippet(snippet)}
-                      onMouseEnter={() => setSelectedIndex(index)}
-                      style={{ fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif' }}
-                    >
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${contentType} bg-opacity-90`}>
-                        <Icon className="h-4 w-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate font-medium text-white text-sm leading-5">
-                          {snippet.title}
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge variant="secondary" className="bg-slate-700/50 text-slate-200 px-2 py-0.5 rounded-md font-medium text-xs">
-                            {snippet.category || "General"}
-                          </Badge>
-                          {snippet.trigger && (
-                            <>
-                              <span className="text-xs text-slate-500">•</span>
-                              <span className="text-xs font-mono text-emerald-400">
-                                {snippet.trigger.includes('-') ? snippet.trigger.split('-')[0] : snippet.trigger}
-                              </span>
-                            </>
-                          )}
-                          <span className="text-xs text-slate-500">•</span>
-                          <span className="text-xs text-slate-500 font-mono">⌘{index + 2}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={e => {
-                            e.stopPropagation();
-                            handleSelectSnippet(snippet);
-                          }}
-                          className="h-8 w-8 p-0 text-slate-400 hover:text-emerald-400 hover:bg-emerald-500/20 rounded-lg"
-                          tabIndex={-1}
-                        >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={e => {
-                            e.stopPropagation();
-                            onEditSnippet(snippet);
-                          }}
-                          className="h-8 w-8 p-0 text-slate-400 hover:text-blue-400 hover:bg-blue-500/20 rounded-lg"
-                          tabIndex={-1}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={e => handleDeleteSnippet(e, snippet.id)}
-                          className="h-8 w-8 p-0 text-slate-400 hover:text-red-400 hover:bg-red-500/20 rounded-lg"
-                          disabled={deleteSnippetMutation.isPending}
-                          tabIndex={-1}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </li>
-                  );
-                }
-              })}
-            </ul>
+            <SnippetList
+              items={filteredItems.filter(item => item.type === 'snippet').map(item => item.data)}
+              type="snippet"
+              onCopy={async (snippet) => {
+                await copyToClipboard(snippet.content);
+                toast({
+                  title: "Snippet copied",
+                  description: `\"${snippet.title}\" has been copied to clipboard.`,
+                });
+                onClose();
+              }}
+              onEdit={onEditSnippet}
+              onDelete={(id) => deleteSnippetMutation.mutate(id)}
+            />
           )}
         </div>
 

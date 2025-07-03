@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,69 +14,9 @@ import { useClipboardMonitor } from "@/hooks/use-clipboard-monitor";
 import type { Snippet, ClipboardItem, Settings } from "@shared/schema";
 import { Link } from "wouter";
 
-// Legacy keyboard shortcuts hook for opening overlays
-function useLegacyKeyboardShortcuts({ onSnippetsOpen, onClipboardOpen }: {
-  onSnippetsOpen: () => void;
-  onClipboardOpen: () => void;
-}) {
-  const { data: settings } = useQuery<Settings>({
-    queryKey: ["/api/settings"],
-    refetchInterval: 1000, // Refetch every second to get real-time updates
-  });
-
-  useEffect(() => {
-    const parseShortcut = (shortcut: string) => {
-      if (!shortcut) return { modifiers: [], key: "" };
-      
-      const parts = shortcut.toLowerCase().split('+');
-      const modifiers = parts.slice(0, -1);
-      const key = parts[parts.length - 1];
-      return { modifiers, key };
-    };
-
-    const checkShortcut = (e: KeyboardEvent, shortcut: string) => {
-      if (!shortcut) return false;
-      
-      const { modifiers, key } = parseShortcut(shortcut);
-      
-      const pressedModifiers: string[] = [];
-      if (e.ctrlKey || e.metaKey) pressedModifiers.push('ctrl');
-      if (e.altKey) pressedModifiers.push('alt');
-      if (e.shiftKey) pressedModifiers.push('shift');
-      
-      const pressedKey = e.key.toLowerCase();
-      
-      return (
-        modifiers.length === pressedModifiers.length &&
-        modifiers.every(mod => pressedModifiers.includes(mod)) &&
-        key === pressedKey
-      );
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (!settings) return;
-
-      // Check snippet shortcut
-      if (checkShortcut(e, settings.snippetShortcut)) {
-        e.preventDefault();
-        onSnippetsOpen();
-      }
-      
-      // Check clipboard shortcut
-      if (checkShortcut(e, settings.clipboardShortcut)) {
-        e.preventDefault();
-        onClipboardOpen();
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [onSnippetsOpen, onClipboardOpen, settings]);
-}
-
 export default function Dashboard() {
-  const [snippetModalOpen, setSnippetModalOpen] = useState(false);
-  const [clipboardModalOpen, setClipboardModalOpen] = useState(false);
+  const dashboardInstance = Math.random().toString(36).slice(2, 8);
+  console.log('Dashboard rendered', dashboardInstance);
   const [snippetEditorOpen, setSnippetEditorOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
   const [folderCreationModalOpen, setFolderCreationModalOpen] = useState(false);
@@ -94,12 +34,6 @@ export default function Dashboard() {
     queryKey: ["/api/settings"],
   });
 
-  // Initialize legacy keyboard shortcuts for opening overlays
-  useLegacyKeyboardShortcuts({
-    onSnippetsOpen: () => setSnippetModalOpen(true),
-    onClipboardOpen: () => setClipboardModalOpen(true),
-  });
-
   // Initialize new snippet keyboard shortcuts
   useKeyboardShortcuts();
 
@@ -109,18 +43,15 @@ export default function Dashboard() {
   const handleEditSnippet = (snippet: Snippet) => {
     setEditingSnippet(snippet);
     setSnippetEditorOpen(true);
-    setSnippetModalOpen(false);
   };
 
   const handleNewSnippet = () => {
     setEditingSnippet(null);
     setSnippetEditorOpen(true);
-    setSnippetModalOpen(false);
   };
 
   const handleCreateFolder = () => {
     setFolderCreationModalOpen(true);
-    setSnippetModalOpen(false);
   };
 
   const getRecentActivity = () => {
@@ -163,6 +94,14 @@ export default function Dashboard() {
     
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays}d ago`;
+  };
+
+  const openGlobalSnippetOverlay = () => {
+    window.dispatchEvent(new CustomEvent('open-snippet-overlay'));
+  };
+
+  const openGlobalClipboardOverlay = () => {
+    window.dispatchEvent(new CustomEvent('open-clipboard-overlay'));
   };
 
   return (
@@ -225,7 +164,7 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Quick Snippets</h3>
               <p className="text-slate-600 text-sm mb-4">Access your code snippets instantly with keyboard shortcuts</p>
               <Button 
-                onClick={() => setSnippetModalOpen(true)}
+                onClick={openGlobalSnippetOverlay}
                 className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0"
               >
                 Open Snippets
@@ -246,7 +185,7 @@ export default function Dashboard() {
               <h3 className="text-lg font-semibold text-slate-900 mb-2">Clipboard History</h3>
               <p className="text-slate-600 text-sm mb-4">Never lose important copied content with smart history</p>
               <Button 
-                onClick={() => setClipboardModalOpen(true)}
+                onClick={openGlobalClipboardOverlay}
                 className="w-full bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white border-0"
               >
                 View History
@@ -389,7 +328,7 @@ export default function Dashboard() {
                   <p className="text-slate-500 mb-6">Create your first snippet or copy something to get started!</p>
                   <div className="flex items-center justify-center space-x-3">
                     <Button 
-                      onClick={() => setSnippetModalOpen(true)}
+                      onClick={handleNewSnippet}
                       size="sm"
                       className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0"
                     >
@@ -412,15 +351,15 @@ export default function Dashboard() {
 
       {/* Modals */}
       <SnippetManager
-        isOpen={snippetModalOpen}
-        onClose={() => setSnippetModalOpen(false)}
+        isOpen={false}
+        onClose={() => {}}
         onEditSnippet={handleEditSnippet}
         onNewSnippet={handleNewSnippet}
       />
 
       <ClipboardHistory
-        isOpen={clipboardModalOpen}
-        onClose={() => setClipboardModalOpen(false)}
+        isOpen={false}
+        onClose={() => {}}
       />
 
       <SnippetEditor

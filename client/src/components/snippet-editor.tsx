@@ -17,9 +17,10 @@ interface SnippetEditorProps {
   isOpen: boolean;
   onClose: () => void;
   editingSnippet?: Snippet | null;
+  onCreate?: (snippet: Snippet) => void;
 }
 
-export default function SnippetEditor({ isOpen, onClose, editingSnippet }: SnippetEditorProps) {
+export default function SnippetEditor({ isOpen, onClose, editingSnippet, onCreate }: SnippetEditorProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
   const [shortcut, setShortcut] = useState("");
@@ -157,12 +158,13 @@ export default function SnippetEditor({ isOpen, onClose, editingSnippet }: Snipp
       const result = await response.json();
       return result;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ["/api/snippets"] });
       toast({
         title: "Success",
         description: "Snippet created successfully",
       });
+      if (onCreate) onCreate(result);
       onClose();
     },
     onError: (error: Error) => {
