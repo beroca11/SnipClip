@@ -3,9 +3,75 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
+// Security middleware
+app.use((req, res, next) => {
+  // Security headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+  
+  // Content Security Policy
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // unsafe-inline/eval needed for Vite dev mode
+    "style-src 'self' 'unsafe-inline'", // unsafe-inline needed for CSS-in-JS
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self' wss: ws:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'"
+  ].join('; ');
+  
+  res.setHeader('Content-Security-Policy', csp);
+  
+  // Remove server fingerprinting
+  res.removeHeader('X-Powered-By');
+  
+  next();
+});
+
+// CORS configuration
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    'http://localhost:5002',
+    'http://localhost:5001',
+    'https://snipclip.onrender.com'
+  ];
+  
+  // Allow development origins
+  if (process.env.NODE_ENV === 'development') {
+    allowedOrigins.push('http://localhost:3000', 'http://127.0.0.1:5002', 'http://127.0.0.1:5001');
+  }
+  
+  if (!origin || allowedOrigins.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin || '*');
+  }
+  
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-session-token, x-user-id');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Access-Control-Max-Age', '86400'); // 24 hours
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+    return;
+  }
+  
+  next();
+});
+
+// Body parsing middleware with limits
+app.use(express.json({ limit: '10mb' })); // Limit request body size
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -22,7 +88,15 @@ app.use((req, res, next) => {
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        // Don't log sensitive data
+        const safeResponse = { ...capturedJsonResponse };
+        if (safeResponse.sessionToken) {
+          safeResponse.sessionToken = '[REDACTED]';
+        }
+        if (safeResponse.userId) {
+          safeResponse.userId = '[REDACTED]';
+        }
+        logLine += ` :: ${JSON.stringify(safeResponse)}`;
       }
 
       if (logLine.length > 80) {
@@ -40,11 +114,25 @@ app.use((req, res, next) => {
   try {
     const server = await registerRoutes(app);
 
+    // Global error handler
     app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
       const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
       
-      console.error('Server error:', err);
+      // Don't expose internal errors in production
+      let message = "Internal Server Error";
+      if (process.env.NODE_ENV === 'development') {
+        message = err.message || "Internal Server Error";
+      } else if (status >= 400 && status < 500) {
+        message = err.message || "Bad Request";
+      }
+      
+      console.error('Server error:', {
+        message: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+        status,
+        timestamp: new Date().toISOString()
+      });
+      
       res.status(status).json({ message });
     });
 
@@ -81,7 +169,7 @@ app.use((req, res, next) => {
   }
 
   // Serve the app on port 5001 (production) or 5002 (development)
-  const port = process.env.NODE_ENV === "production" ? 5001 : 5002;
+  const port = process.env.PORT || (process.env.NODE_ENV === "production" ? 5001 : 5002);
   server.listen({
     port,
     host: "0.0.0.0",

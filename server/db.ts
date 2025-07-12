@@ -11,6 +11,37 @@ import dotenv from 'dotenv';
 // Load environment variables from .env file
 dotenv.config();
 
+// Environment variable validation
+function validateEnvironment() {
+  const required = ['NODE_ENV'];
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    console.warn(`Missing environment variables: ${missing.join(', ')}`);
+  }
+  
+  // Validate DATABASE_URL format if provided
+  if (process.env.DATABASE_URL) {
+    try {
+      const url = new URL(process.env.DATABASE_URL);
+      if (!['postgres:', 'postgresql:'].includes(url.protocol)) {
+        throw new Error('Invalid DATABASE_URL protocol');
+      }
+    } catch (error) {
+      console.error('Invalid DATABASE_URL format:', error);
+      throw new Error('DATABASE_URL must be a valid PostgreSQL connection string');
+    }
+  }
+  
+  // Validate SESSION_SECRET
+  if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length < 32) {
+    console.warn('SESSION_SECRET should be at least 32 characters long for security');
+  }
+}
+
+// Run environment validation
+validateEnvironment();
+
 // Configure Neon for serverless environment - proper WebSocket constructor
 neonConfig.webSocketConstructor = ws;
 
@@ -30,7 +61,15 @@ if (hasDatabaseUrl) {
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000,
+    // Add SSL configuration for production
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
   });
+  
+  // Test the connection
+  pool.on('error', (err) => {
+    console.error('Database connection error:', err);
+  });
+  
   db = drizzle({ client: pool, schema });
   console.log('Using Neon PostgreSQL database');
 } else if (useSQLite) {
@@ -42,6 +81,13 @@ if (hasDatabaseUrl) {
   
   const dbPath = path.join(dataDir, "snippets.db");
   sqliteDb = new Database(dbPath);
+  
+  // Enable WAL mode for better performance and concurrency
+  sqliteDb.pragma('journal_mode = WAL');
+  sqliteDb.pragma('synchronous = NORMAL');
+  sqliteDb.pragma('cache_size = 1000');
+  sqliteDb.pragma('temp_store = memory');
+  
   db = drizzleSQLite(sqliteDb, { schema });
   console.log('Using SQLite database for development');
 } else {
@@ -61,6 +107,7 @@ export function cleanup() {
   }
 }
 
-// Handle process termination
+// Handle graceful shutdown
 process.on('SIGINT', cleanup);
 process.on('SIGTERM', cleanup);
+process.on('exit', cleanup);

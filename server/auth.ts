@@ -7,14 +7,15 @@ export interface UserCredentials {
 
 export interface UserSession {
   userId: string;
-  pin: string;
-  passphrase: string;
+  createdAt: number;
+  expiresAt: number;
+  // Removed pin and passphrase from session storage for security
 }
 
 // Generate a consistent user ID from PIN and passphrase
 export function generateUserId(pin: string, passphrase: string): string {
   // Combine PIN and passphrase with a salt for security
-  const salt = "SnipClip_Sync_v1"; // Version-specific salt
+  const salt = process.env.SESSION_SECRET || "SnipClip_Sync_v1_default"; // Use environment variable for salt
   const combined = `${pin}:${passphrase}:${salt}`;
   
   // Create a SHA-256 hash
@@ -31,49 +32,111 @@ export function validatePin(pin: string): boolean {
 
 // Validate passphrase (minimum 8 characters, alphanumeric + special chars)
 export function validatePassphrase(passphrase: string): boolean {
-  return passphrase.length >= 8 && /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(passphrase);
+  return passphrase.length >= 8 && 
+         passphrase.length <= 256 && // Add maximum length
+         /^[a-zA-Z0-9!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+$/.test(passphrase);
 }
 
-// Create a session token for the user
-export function createSessionToken(userId: string, pin: string, passphrase: string): string {
-  const sessionData = `${userId}:${pin}:${passphrase}:${Date.now()}`;
-  return crypto.createHash('sha256').update(sessionData).digest('hex');
+// Create a cryptographically secure session token
+export function createSessionToken(): string {
+  // Use crypto.randomBytes for secure random token generation
+  return crypto.randomBytes(32).toString('hex');
 }
 
-// Verify session token
-export function verifySessionToken(token: string, userId: string, pin: string, passphrase: string): boolean {
-  const expectedToken = createSessionToken(userId, pin, passphrase);
-  return token === expectedToken;
-}
+// Session configuration
+const SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+const MAX_SESSIONS_PER_USER = 5; // Limit concurrent sessions
 
-// In-memory session store (for development)
+// In-memory session store (for development - should use Redis/database in production)
 const sessions = new Map<string, UserSession>();
+const userSessions = new Map<string, Set<string>>(); // Track sessions per user
 
 // Check if we're in development mode
 const isDevelopment = process.env.NODE_ENV === 'development' || process.env.NODE_ENV === undefined;
 
-export function createSession(userId: string, pin: string, passphrase: string): string {
-  const token = createSessionToken(userId, pin, passphrase);
-  sessions.set(token, { userId, pin, passphrase });
+export function createSession(userId: string): string {
+  const token = createSessionToken();
+  const now = Date.now();
+  const session: UserSession = {
+    userId,
+    createdAt: now,
+    expiresAt: now + SESSION_DURATION
+  };
+  
+  sessions.set(token, session);
+  
+  // Track sessions per user
+  if (!userSessions.has(userId)) {
+    userSessions.set(userId, new Set());
+  }
+  
+  const userSessionSet = userSessions.get(userId)!;
+  userSessionSet.add(token);
+  
+  // Limit concurrent sessions per user
+  if (userSessionSet.size > MAX_SESSIONS_PER_USER) {
+    const oldestSessions = Array.from(userSessionSet).slice(0, userSessionSet.size - MAX_SESSIONS_PER_USER);
+    oldestSessions.forEach(oldToken => {
+      sessions.delete(oldToken);
+      userSessionSet.delete(oldToken);
+    });
+  }
+  
   return token;
 }
 
 export function getSession(token: string): UserSession | undefined {
-  return sessions.get(token);
+  if (!token) return undefined;
+  
+  const session = sessions.get(token);
+  if (!session) return undefined;
+  
+  // Check if session has expired
+  if (Date.now() > session.expiresAt) {
+    removeSession(token);
+    return undefined;
+  }
+  
+  return session;
 }
 
 export function removeSession(token: string): boolean {
+  const session = sessions.get(token);
+  if (session) {
+    const userSessionSet = userSessions.get(session.userId);
+    if (userSessionSet) {
+      userSessionSet.delete(token);
+      if (userSessionSet.size === 0) {
+        userSessions.delete(session.userId);
+      }
+    }
+  }
+  
   return sessions.delete(token);
 }
 
-// Enhanced authentication function that's more lenient in development
+// Remove all sessions for a user (useful for logout all devices)
+export function removeAllUserSessions(userId: string): void {
+  const userSessionSet = userSessions.get(userId);
+  if (userSessionSet) {
+    userSessionSet.forEach(token => sessions.delete(token));
+    userSessions.delete(userId);
+  }
+}
+
+// Secure authentication function
 export function authenticateUser(sessionToken?: string, userId?: string): string | null {
-  // In development mode, allow fallback to userId only
-  if (isDevelopment && userId) {
-    return userId;
+  // Always require session token in production
+  if (!isDevelopment) {
+    if (!sessionToken) return null;
+    
+    const session = getSession(sessionToken);
+    if (!session) return null;
+    
+    return session.userId;
   }
   
-  // Check session token
+  // In development mode, still prefer session token but allow fallback
   if (sessionToken) {
     const session = getSession(sessionToken);
     if (session) {
@@ -81,36 +144,40 @@ export function authenticateUser(sessionToken?: string, userId?: string): string
     }
   }
   
-  // In development mode, if no valid session but userId is provided, allow it
-  if (isDevelopment && userId) {
-    console.log('Development mode: Allowing userId fallback authentication');
+  // Development fallback - but only if explicitly enabled
+  if (isDevelopment && userId && process.env.ALLOW_DEV_BYPASS === 'true') {
+    console.warn('Development mode: Allowing userId fallback authentication - THIS SHOULD NOT BE USED IN PRODUCTION');
     return userId;
   }
   
   return null;
 }
 
-// Clean up old sessions (older than 24 hours)
+// Clean up expired sessions
 export function cleanupSessions(): void {
   const now = Date.now();
-  const oneDay = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  
-  const tokensToDelete: string[] = [];
+  const expiredTokens: string[] = [];
   
   sessions.forEach((session, token) => {
-    // Extract timestamp from token (last part after the last colon)
-    const parts = token.split(':');
-    if (parts.length > 0) {
-      const timestamp = parseInt(parts[parts.length - 1]);
-      if (now - timestamp > oneDay) {
-        tokensToDelete.push(token);
-      }
+    if (now > session.expiresAt) {
+      expiredTokens.push(token);
     }
   });
   
-  // Delete expired sessions
-  tokensToDelete.forEach(token => sessions.delete(token));
+  expiredTokens.forEach(token => removeSession(token));
+  
+  if (expiredTokens.length > 0) {
+    console.log(`Cleaned up ${expiredTokens.length} expired sessions`);
+  }
+}
+
+// Validate session token format
+export function isValidSessionToken(token: string): boolean {
+  return typeof token === 'string' && /^[a-f0-9]{64}$/.test(token);
 }
 
 // Run cleanup every hour
-setInterval(cleanupSessions, 60 * 60 * 1000); 
+setInterval(cleanupSessions, 60 * 60 * 1000);
+
+// Run initial cleanup
+cleanupSessions(); 
