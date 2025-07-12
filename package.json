@@ -17,7 +17,10 @@
     "db:reset": "npx tsx scripts/setup-db.ts reset",
     "test:db": "node scripts/test-db.js",
     "fix:folders": "node scripts/fix-snippet-folders.js",
-    "remove:subfolders": "node scripts/remove-subfolders.js"
+    "remove:subfolders": "node scripts/remove-subfolders.js",
+    "db:test-connection": "npx tsx scripts/test-db-connection.ts",
+    "db:migrate-json": "npx tsx scripts/migrate-json-to-postgres.ts",
+    "db:setup": "npx tsx scripts/setup-postgres-migration.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

@@ -7,6 +7,11 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # IMPORTANT: Replace this with your actual PostgreSQL connection string
+      # Get one from: https://neon.tech, https://supabase.com, or any PostgreSQL provider
       - key: DATABASE_URL
         value: "postgresql://your-username:your-password@ep-your-project.region.aws.neon.tech/your-database?sslmode=require"
+      # Generate a secure session secret (at least 32 characters)
+      - key: SESSION_SECRET
+        value: "your-secure-session-secret-here-make-it-at-least-32-characters-long"
     plan: free 

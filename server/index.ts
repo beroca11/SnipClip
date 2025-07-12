@@ -170,18 +170,33 @@ app.use((req, res, next) => {
 
   // Serve the app on port 5001 (production) or 5002 (development)
   const port = process.env.PORT || (process.env.NODE_ENV === "production" ? 5001 : 5002);
+  
+  // Ensure NODE_ENV is set for production deployments
+  if (!process.env.NODE_ENV) {
+    process.env.NODE_ENV = "production";
+    console.log("NODE_ENV not set, defaulting to production");
+  }
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, async () => {
-    log(`serving on port ${port}`);
-    // Run any pending migrations
-    try {
-      const { runMigrations } = await import("./migrations");
-      await runMigrations();
-    } catch (error) {
-      console.log("Migration system not available or no migrations needed");
+    log(`serving on port ${port} in ${process.env.NODE_ENV} mode`);
+    
+    // Check if we need to run migrations
+    if (process.env.DATABASE_URL) {
+      console.log("🔧 Database URL detected, running migrations...");
+      try {
+        const { runMigrations } = await import("./migrations");
+        await runMigrations();
+      } catch (error) {
+        console.error("❌ Migration failed:", error);
+        console.log("💡 Try running: npm run db:setup");
+      }
+    } else {
+      console.log("⚠️  No DATABASE_URL found. Using file storage.");
+      console.log("💡 To migrate to PostgreSQL, run: npm run db:setup");
     }
   });
   } catch (error) {
