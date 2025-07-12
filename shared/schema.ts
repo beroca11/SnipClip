@@ -208,3 +208,7 @@ export type ClipboardItem = typeof clipboardItems.$inferSelect;
 
 export type InsertSettings = z.infer<typeof insertSettingsSchema>;
 export type Settings = typeof settings.$inferSelect;
+
+// Partial settings schema for updates
+export const updateSettingsSchema = insertSettingsSchema.partial();
+export type UpdateSettings = z.infer<typeof updateSettingsSchema>;

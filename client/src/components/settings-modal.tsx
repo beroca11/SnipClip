@@ -11,7 +11,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertSettingsSchema, type Settings as SettingsType, type InsertSettings } from "@shared/schema";
+import { insertSettingsSchema, type Settings as SettingsType, type InsertSettings, type UpdateSettings } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { ShortcutInput } from "@/components/ui/shortcut-input";
 import { ShortcutTester } from "@/components/ui/shortcut-tester";
@@ -51,13 +51,13 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         clipboardEnabled: settings.clipboardEnabled,
         historyLimit: settings.historyLimit,
         launchOnStartup: settings.launchOnStartup,
-        theme: settings.theme,
+        theme: (settings.theme === "light" || settings.theme === "dark") ? settings.theme : "light",
       });
     }
   }, [settings, form]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: InsertSettings) => {
+    mutationFn: async (data: UpdateSettings) => {
       return await apiRequest("PUT", "/api/settings", data);
     },
     onSuccess: () => {
@@ -77,7 +77,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     },
   });
 
-  const onSubmit = async (data: InsertSettings) => {
+  const onSubmit = async (data: UpdateSettings) => {
     console.log("Submitting settings", data);
     setIsSaving(true);
     try {
@@ -95,7 +95,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         clipboardEnabled: settings.clipboardEnabled,
         historyLimit: settings.historyLimit,
         launchOnStartup: settings.launchOnStartup,
-        theme: settings.theme,
+        theme: (settings.theme === "light" || settings.theme === "dark") ? settings.theme : "light",
       });
     }
     onClose();
