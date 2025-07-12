@@ -14,7 +14,14 @@
     "db:status": "npx tsx scripts/setup-db.ts status",
     "db:init": "npx tsx scripts/setup-db.ts init",
     "db:test": "npx tsx scripts/setup-db.ts test",
-    "db:reset": "npx tsx scripts/setup-db.ts reset"
+    "db:reset": "npx tsx scripts/setup-db.ts reset",
+    "migrate:interactive": "npx tsx scripts/migrate-user-data.ts",
+    "migrate:list": "npx tsx scripts/migrate-user-data-cli.ts --list-users",
+    "migrate:summary": "npx tsx scripts/migrate-user-data-cli.ts --user-summary",
+    "migrate:dry-run": "npx tsx scripts/migrate-user-data-cli.ts --source --target --all --dry-run",
+    "migrate:run": "npx tsx scripts/migrate-user-data-cli.ts --source --target --all",
+    "migrate:users": "npx tsx scripts/migrate-users.ts",
+    "db:check": "npx tsx scripts/check-existing-data.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
