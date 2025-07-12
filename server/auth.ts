@@ -1,5 +1,14 @@
 import crypto from 'crypto';
 
+// Ensure consistent SESSION_SECRET across environments
+const SESSION_SECRET = process.env.SESSION_SECRET || "SnipClip_Sync_v1_default_DO_NOT_USE_IN_PRODUCTION";
+
+// Warn if using default secret in production
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  console.warn('WARNING: Using default SESSION_SECRET in production. This is insecure and will cause user ID inconsistencies.');
+  console.warn('Please set the SESSION_SECRET environment variable to a secure random string.');
+}
+
 export interface UserCredentials {
   pin: string;
   passphrase: string;
@@ -14,12 +23,11 @@ export interface UserSession {
 
 // Generate a consistent user ID from PIN and passphrase
 export function generateUserId(pin: string, passphrase: string): string {
-  // Combine PIN and passphrase with a salt for security
-  const salt = process.env.SESSION_SECRET || "SnipClip_Sync_v1_default"; // Use environment variable for salt
-  const combined = `${pin}:${passphrase}:${salt}`;
+  // Combine PIN and passphrase with a consistent salt
+  const combined = `${pin}:${passphrase}:${SESSION_SECRET}`;
   
   // Create a SHA-256 hash
-  const hash = crypto.createHash('sha256').update(combined).digest('hex');
+  const hash = crypto.createHash('sha256').update(combined, 'utf8').digest('hex');
   
   // Return first 32 characters for a shorter but still unique ID
   return hash.substring(0, 32);

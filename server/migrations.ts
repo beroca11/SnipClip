@@ -41,29 +41,32 @@ export async function runMigrations() {
 }
 
 async function runSQLiteMigrations() {
-  // Create folders table
+  // Create folders table with user_id and proper unique constraint
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS folders (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      user_id TEXT NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
-      sort_order INTEGER NOT NULL DEFAULT 0
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      UNIQUE(name, user_id)
     )
   `);
 
-  // Create snippets table with folderId
+  // Create snippets table with folderId and proper unique constraint
   await db.run(sql`
     CREATE TABLE IF NOT EXISTS snippets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
-      trigger TEXT NOT NULL UNIQUE,
+      trigger TEXT NOT NULL,
       description TEXT,
       folder_id INTEGER,
       user_id TEXT NOT NULL,
       created_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
       updated_at INTEGER NOT NULL DEFAULT (strftime('%s', 'now')),
+      UNIQUE(trigger, user_id),
       FOREIGN KEY(folder_id) REFERENCES folders(id)
     )
   `);
@@ -96,37 +99,11 @@ async function runSQLiteMigrations() {
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_user_id ON clipboard_items(user_id)`);
   await db.run(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_created_at ON clipboard_items(created_at)`);
 
-  // Create default General folder and assign all existing snippets
-  const result = await db.get(sql`SELECT id FROM folders WHERE name = 'General'`);
-  let generalFolderId = result?.id;
-  if (!generalFolderId) {
-    const insert = await db.run(sql`INSERT INTO folders (name) VALUES ('General')`);
-    generalFolderId = insert.lastID;
-  }
+  // Migration logic for existing data will be handled per-user when they first log in
+  // This ensures each user gets their own General folder automatically
+  console.log("Database tables created successfully. General folders will be created per-user on first login.");
   
-  // Handle existing subfolders by moving their snippets to General and flattening the structure
-  const subfolders = await db.all(sql`SELECT id, name FROM folders WHERE parent_id IS NOT NULL`);
-  for (const subfolder of subfolders) {
-    // Move snippets from subfolder to General
-    await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id = ?`, [generalFolderId, subfolder.id]);
-    console.log(`Moved snippets from subfolder "${subfolder.name}" to General`);
-  }
-  
-  // Remove all subfolders (folders with parent_id)
-  await db.run(sql`DELETE FROM folders WHERE parent_id IS NOT NULL`);
-  
-  // Ensure all snippets have a folder (assign to General if null)
-  await db.run(sql`UPDATE snippets SET folder_id = ? WHERE folder_id IS NULL`, [generalFolderId]);
-  
-  // Add a trigger to automatically assign new snippets to General folder if no folder is specified
-  await db.run(sql`
-    CREATE TRIGGER IF NOT EXISTS set_default_folder
-    AFTER INSERT ON snippets
-    WHEN NEW.folder_id IS NULL
-    BEGIN
-      UPDATE snippets SET folder_id = (SELECT id FROM folders WHERE name = 'General' LIMIT 1) WHERE id = NEW.id;
-    END
-  `);
+  // Default folder assignment is handled in the application logic per-user
 
   // Add sort_order column to folders if not exist
   await db.run(sql`ALTER TABLE folders ADD COLUMN IF NOT EXISTS sort_order INTEGER NOT NULL DEFAULT 0`);
@@ -169,29 +146,32 @@ async function runSQLiteMigrations() {
 }
 
 async function runPostgreSQLMigrations() {
-  // Create folders table
+  // Create folders table with user_id and proper unique constraint
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS folders (
       id SERIAL PRIMARY KEY,
-      name TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL,
+      user_id TEXT NOT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
       updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      sort_order INTEGER DEFAULT 0
+      sort_order INTEGER DEFAULT 0,
+      UNIQUE(name, user_id)
     )
   `);
 
-  // Create snippets table with folderId
+  // Create snippets table with folderId and proper unique constraint
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS snippets (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
       content TEXT NOT NULL,
-      trigger TEXT NOT NULL UNIQUE,
+      trigger TEXT NOT NULL,
       description TEXT,
       folder_id INTEGER REFERENCES folders(id),
       user_id TEXT NOT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      UNIQUE(trigger, user_id)
     )
   `);
 
@@ -223,46 +203,9 @@ async function runPostgreSQLMigrations() {
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_user_id ON clipboard_items(user_id)`);
   await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_clipboard_items_created_at ON clipboard_items(created_at)`);
 
-  // Create default General folder and assign all existing snippets
-  const result = await db.execute(sql`SELECT id FROM folders WHERE name = 'General'`);
-  let generalFolderId = result?.rows?.[0]?.id;
-  if (!generalFolderId) {
-    const insert = await db.execute(sql`INSERT INTO folders (name) VALUES ('General') RETURNING id`);
-    generalFolderId = insert?.rows?.[0]?.id;
-  }
-  
-  // Handle existing subfolders by moving their snippets to General and flattening the structure
-  const subfolders = await db.execute(sql`SELECT id, name FROM folders WHERE parent_id IS NOT NULL`);
-  for (const subfolder of subfolders?.rows || []) {
-    // Move snippets from subfolder to General
-    await db.execute(sql`UPDATE snippets SET folder_id = ${generalFolderId} WHERE folder_id = ${subfolder.id}`);
-    console.log(`Moved snippets from subfolder "${subfolder.name}" to General`);
-  }
-  
-  // Remove all subfolders (folders with parent_id)
-  await db.execute(sql`DELETE FROM folders WHERE parent_id IS NOT NULL`);
-  
-  // Ensure all snippets have a folder (assign to General if null)
-  await db.execute(sql`UPDATE snippets SET folder_id = ${generalFolderId} WHERE folder_id IS NULL`);
-  
-  // Add a trigger to automatically assign new snippets to General folder if no folder is specified
-  await db.execute(sql`
-    CREATE OR REPLACE FUNCTION set_default_folder()
-    RETURNS TRIGGER AS $$
-    BEGIN
-      IF NEW.folder_id IS NULL THEN
-        NEW.folder_id := (SELECT id FROM folders WHERE name = 'General' LIMIT 1);
-      END IF;
-      RETURN NEW;
-    END;
-    $$ LANGUAGE plpgsql;
-    
-    DROP TRIGGER IF EXISTS set_default_folder_trigger ON snippets;
-    CREATE TRIGGER set_default_folder_trigger
-      BEFORE INSERT ON snippets
-      FOR EACH ROW
-      EXECUTE FUNCTION set_default_folder();
-  `);
+  // Migration logic for existing data will be handled per-user when they first log in
+  // This ensures each user gets their own General folder automatically
+  console.log("Database tables created successfully. General folders will be created per-user on first login.");
 
   // Add sort_order column to folders if not exist
   await db.execute(sql`
