@@ -5,6 +5,8 @@ import { insertSnippetSchema, insertClipboardItemSchema, insertSettingsSchema } 
 import { z } from "zod";
 import { 
   generateUserId, 
+  resolveUserId,
+  createUserMapping,
   validatePin, 
   validatePassphrase, 
   createSession, 
@@ -136,8 +138,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Passphrase must be at least 8 characters and contain only letters, numbers, and special characters" });
     }
     
-    // Generate consistent user ID
-    const userId = generateUserId(pin, passphrase);
+    // Resolve user ID (handles SESSION_SECRET changes)
+    const userId = await resolveUserId(pin, passphrase);
+    
+    // Create or update user mapping for future logins
+    await createUserMapping(pin, passphrase, userId);
     
     // Create session with new secure method
     const sessionToken = createSession(userId);

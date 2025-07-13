@@ -55,6 +55,16 @@ export const settings = pgTable("settings", {
   theme: text("theme").notNull().default("light"),
 });
 
+// User mappings table to handle SESSION_SECRET changes
+export const userMappings = pgTable("user_mappings", {
+  id: serial("id").primaryKey(),
+  pin: text("pin").notNull(),
+  passphraseHash: text("passphrase_hash").notNull(), // Store hash of passphrase for security
+  userId: text("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // SQLite schema (for development)
 export const foldersSQLite = sqliteTableCore("folders", {
   id: integerSQLite("id").primaryKey({ autoIncrement: true }),

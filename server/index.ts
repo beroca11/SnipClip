@@ -1,3 +1,23 @@
+// Global error handling for WebSocket compatibility issues
+process.on('uncaughtException', (error) => {
+  if (error.message.includes('Cannot set property message of #<ErrorEvent>')) {
+    console.warn('WebSocket error handled gracefully (Neon database compatibility issue)');
+    return;
+  }
+  console.error('Uncaught Exception:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  if (reason && typeof reason === 'object' && 'message' in reason) {
+    const message = (reason as any).message;
+    if (message && message.includes('Cannot set property message of #<ErrorEvent>')) {
+      console.warn('WebSocket promise rejection handled gracefully (Neon database compatibility issue)');
+      return;
+    }
+  }
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";

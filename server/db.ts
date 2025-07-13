@@ -56,22 +56,45 @@ let db: any = null;
 
 if (hasDatabaseUrl) {
   // Use Neon PostgreSQL (production or when DATABASE_URL is provided)
-  pool = new Pool({ 
-    connectionString: process.env.DATABASE_URL,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000,
-    // Add SSL configuration for production
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
-  });
-  
-  // Test the connection
-  pool.on('error', (err) => {
+  try {
+    pool = new Pool({ 
+      connectionString: process.env.DATABASE_URL,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+      // Add SSL configuration for production
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+    });
+    
+      // Test the connection
+  pool.on('error', (err: any) => {
     console.error('Database connection error:', err);
   });
-  
-  db = drizzle({ client: pool, schema });
-  console.log('Using Neon PostgreSQL database');
+    
+    db = drizzle({ client: pool, schema });
+    console.log('Using Neon PostgreSQL database');
+  } catch (error) {
+    console.error('Failed to initialize Neon database:', error);
+    console.log('Falling back to SQLite...');
+    
+    // Fallback to SQLite
+    const dataDir = path.resolve(process.cwd(), "data");
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    
+    const dbPath = path.join(dataDir, "snippets.db");
+    sqliteDb = new Database(dbPath);
+    
+    // Enable WAL mode for better performance and concurrency
+    sqliteDb.pragma('journal_mode = WAL');
+    sqliteDb.pragma('synchronous = NORMAL');
+    sqliteDb.pragma('cache_size = 1000');
+    sqliteDb.pragma('temp_store = memory');
+    
+    db = drizzleSQLite(sqliteDb, { schema });
+    console.log('Using SQLite database (fallback)');
+  }
 } else if (useSQLite) {
   // Use SQLite for development
   const dataDir = path.resolve(process.cwd(), "data");
