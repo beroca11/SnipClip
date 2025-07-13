@@ -4,6 +4,7 @@ import { pgTable, serial, text, timestamp, integer } from 'drizzle-orm/pg-core';
 import { eq, and } from 'drizzle-orm';
 import ws from 'ws';
 import dotenv from 'dotenv';
+import * as readline from 'readline';
 
 dotenv.config();
 neonConfig.webSocketConstructor = ws;
@@ -39,6 +40,15 @@ const clipboardItems = pgTable("clipboard_items", {
   type: text().default('text').notNull(),
   userId: text("user_id").notNull(),
   createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+});
+
+const userMappings = pgTable("user_mappings", {
+  id: serial().primaryKey(),
+  pin: text().notNull(),
+  passphraseHash: text("passphrase_hash").notNull(),
+  userId: text("user_id").notNull(),
+  createdAt: timestamp("created_at", { mode: 'string' }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { mode: 'string' }).defaultNow().notNull(),
 });
 
 class UserMigrator {
@@ -278,6 +288,29 @@ class UserMigrator {
     return { success: stats.errors.length === 0, stats };
   }
 
+  async deleteUserData(userId: string) {
+    // Delete in correct order to respect foreign key constraints
+    const deleted = { folders: 0, snippets: 0, clipboardItems: 0, userMappings: 0 };
+    
+    // 1. Delete snippets first (they reference folders)
+    deleted.snippets = (await this.db.delete(snippets).where(eq(snippets.userId, userId))).rowCount || 0;
+    
+    // 2. Delete folders (no longer referenced by snippets)
+    deleted.folders = (await this.db.delete(folders).where(eq(folders.userId, userId))).rowCount || 0;
+    
+    // 3. Delete clipboard items
+    deleted.clipboardItems = (await this.db.delete(clipboardItems).where(eq(clipboardItems.userId, userId))).rowCount || 0;
+    
+    // 4. Delete user mappings (may not exist in all DBs, so try/catch)
+    try {
+      deleted.userMappings = (await this.db.delete(userMappings).where(eq(userMappings.userId, userId))).rowCount || 0;
+    } catch (e) {
+      deleted.userMappings = 0;
+    }
+    
+    return deleted;
+  }
+
   async close() {
     await this.pool.end();
   }
@@ -298,6 +331,7 @@ Commands:
   list                          List all users
   summary <userId>              Show user summary
   migrate <source> <target>     Migrate from source to target user
+  delete <userId>               Delete all data for a user
   
 Options:
   --dry-run                     Preview changes without executing
@@ -394,6 +428,33 @@ Examples:
       } else {
         console.log('\n❌ Migration completed with errors.');
       }
+    }
+
+    else if (command === 'delete') {
+      const userId = args[1];
+      if (!userId) {
+        console.error('❌ Please provide a user ID');
+        return;
+      }
+             // Confirm prompt
+       const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+      await new Promise((resolve) => {
+        rl.question(`⚠️  Are you sure you want to delete ALL data for user "${userId}"? This cannot be undone! (y/N): `, async (answer: string) => {
+          rl.close();
+          if (answer.trim().toLowerCase() !== 'y') {
+            console.log('❌ Aborted. No data deleted.');
+            resolve(null);
+            return;
+          }
+          const deleted = await migrator.deleteUserData(userId);
+          console.log(`\n🗑️  Deleted for user ${userId}:`);
+          console.log(`  Folders:        ${deleted.folders}`);
+          console.log(`  Snippets:       ${deleted.snippets}`);
+          console.log(`  ClipboardItems: ${deleted.clipboardItems}`);
+          console.log(`  UserMappings:   ${deleted.userMappings}`);
+          resolve(null);
+        });
+      });
     }
     
     else {

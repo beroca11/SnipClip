@@ -2,12 +2,52 @@
 
 This directory contains scripts to migrate user data (folders, snippets, clipboard items, and settings) from one user to another in the SnipClip database.
 
+---
+
+## 🚨 New: User ID Mapping System for SESSION_SECRET Changes
+
+### Why?
+If you ever change your `SESSION_SECRET`, the app used to generate a new user ID for the same PIN/passphrase, causing you to lose access to your old data. Now, SnipClip includes a **user ID mapping system** to ensure you always get the right data, even if the secret changes.
+
+### How does it work?
+- When you log in, the backend checks a new `user_mappings` table to see if your PIN/passphrase is already mapped to a user ID.
+- If so, you always get the same user ID (and thus the same data), regardless of the current `SESSION_SECRET`.
+- If not, the system will create a mapping for you on your next successful login.
+- This means you can safely recover from accidental `SESSION_SECRET` changes and never lose access to your folders/snippets/clipboard.
+
+### New Table: `user_mappings`
+A new table is created in the database:
+- `pin` (text): Your PIN
+- `passphrase_hash` (text): A hash of your passphrase (for security)
+- `user_id` (text): The canonical user ID for this login
+- `created_at`, `updated_at`: Timestamps
+
+### How to Use
+- **Just log in as usual.** The system will resolve your user ID using the mapping table.
+- If you log in after a `SESSION_SECRET` change, the system will try to find your old user ID and map it for you.
+- If you have multiple user IDs, use the migration and consolidation tools below to merge your data.
+
+---
+
+## New: User Data Consolidation Tool
+
+If you have multiple user IDs (e.g., after a secret change), use the new script:
+
+```bash
+npx tsx scripts/consolidate-user-data.ts
+```
+- This script will help you identify which user ID is your real account and guide you through mapping your PIN/passphrase to it.
+- It will also recommend migration steps if you want to merge data from other user IDs.
+
+---
+
 ## Overview
 
-The migration system consists of three main scripts:
-- **`migrate-users.ts`** - **Main migration tool** (recommended) - Complete CLI with all features
-- **`migrate-user-data.ts`** - Interactive CLI with prompts and confirmations
-- **`migrate-user-data-cli.ts`** - Command-line interface for automation and batch processing
+The migration system consists of these scripts:
+- **`migrate-users.ts`** - **Main migration tool** (recommended) - Complete CLI with all features including delete
+- **`consolidate-user-data.ts`** - Interactive tool to map PIN/passphrase to the correct user ID and guide consolidation
+- **`migrate-user-data.ts`** - Legacy interactive CLI (deprecated, use migrate-users.ts instead)
+- **`migrate-user-data-cli.ts`** - Legacy CLI tool (deprecated, use migrate-users.ts instead)
 
 All scripts support PostgreSQL (production) databases with proper Neon configuration.
 
@@ -21,6 +61,7 @@ All scripts support PostgreSQL (production) databases with proper Neon configura
 - ✅ **User Validation**: Checks source/target user existence and data summaries
 - ✅ **Database Support**: Works with PostgreSQL (Neon) databases
 - ✅ **Duplicate Prevention**: Handles conflicts with existing data
+- ✅ **User ID Mapping**: Always get the right data, even after SESSION_SECRET changes
 
 ## Quick Start (Recommended)
 
@@ -44,6 +85,27 @@ npm run migrate:users migrate "source_user" "target_user" --dry-run
 npm run migrate:users migrate "source_user" "target_user"
 ```
 
+### 5. (If needed) Consolidate User Data
+```bash
+npx tsx scripts/consolidate-user-data.ts
+```
+
+---
+
+## How to Recover from SESSION_SECRET Changes
+
+1. **Log in with your original PIN/passphrase.**
+   - If you see your old data, you're done!
+   - If not, run the consolidation tool:
+     ```bash
+     npx tsx scripts/consolidate-user-data.ts
+     ```
+2. **Follow the prompts to select your real user ID.**
+3. **(Optional) Use the migration tool to merge data from other user IDs.**
+4. **Test your login.** You should always see your original data now.
+
+---
+
 ## Main Migration Tool (`migrate-users.ts`)
 
 ### Basic Commands
@@ -59,6 +121,31 @@ npm run migrate:users migrate "source_user" "target_user" --dry-run
 
 # Execute full migration
 npm run migrate:users migrate "source_user" "target_user"
+
+# ⚠️ Delete ALL data for a user (irreversible!)
+npm run migrate:users delete "user_id_here"
+```
+
+### Delete User Data (NEW)
+
+**Danger!** This will permanently delete all folders, snippets, clipboard items, and user mappings for the specified user ID.
+
+- You will be prompted for confirmation before deletion.
+- The CLI will show how many records were deleted from each table.
+
+**Example:**
+```bash
+npm run migrate:users delete "abc123"
+```
+Output:
+```
+⚠️  Are you sure you want to delete ALL data for user "abc123"? This cannot be undone! (y/N): y
+
+🗑️  Deleted for user abc123:
+  Folders:        5
+  Snippets:       42
+  ClipboardItems: 10
+  UserMappings:   1
 ```
 
 ### Advanced Options
@@ -79,25 +166,22 @@ npm run migrate:users --help
 
 ## Alternative Migration Tools
 
-### Interactive Mode
+### User Consolidation Tool
 ```bash
-# Launch interactive migration wizard
-npm run migrate:interactive
+# Launch interactive consolidation wizard
+npm run migrate:consolidate
 ```
 
-### Legacy CLI Mode
+### Legacy Migration Tools (Deprecated)
+These are kept for backward compatibility but the main `migrate-users.ts` tool is recommended:
+
 ```bash
-# List users (alternative method)
-npm run migrate:list
+# Interactive mode (legacy)
+npx tsx scripts/migrate-user-data.ts
 
-# Show user summary (alternative method)
-npm run migrate:summary -- "user_id"
-
-# Dry run with legacy CLI
-npm run migrate:dry-run  # Edit command with actual user IDs
-
-# Execute with legacy CLI
-npm run migrate:run      # Edit command with actual user IDs
+# Legacy CLI mode
+npx tsx scripts/migrate-user-data-cli.ts --list-users
+npx tsx scripts/migrate-user-data-cli.ts --user-summary "user_id"
 ```
 
 ## Command Reference
@@ -127,9 +211,7 @@ npm run migrate:run      # Edit command with actual user IDs
 | Script | Description |
 |--------|-------------|
 | `npm run migrate:users` | **Main migration tool** (recommended) |
-| `npm run migrate:interactive` | Interactive migration wizard |
-| `npm run migrate:list` | List all users (legacy) |
-| `npm run migrate:summary -- "userId"` | Show user summary (legacy) |
+| `npm run migrate:consolidate` | User consolidation wizard |
 | `npm run db:check` | Detailed database inspection |
 
 ## Migration Process
@@ -335,10 +417,11 @@ done
 | Script File | Purpose | Status |
 |-------------|---------|--------|
 | `migrate-users.ts` | **Main migration tool** | ✅ **Recommended** |
-| `migrate-user-data.ts` | Interactive wizard | ✅ Available |
-| `migrate-user-data-cli.ts` | Legacy CLI tool | ✅ Available |
+| `consolidate-user-data.ts` | User ID mapping/consolidation | ✅ **Available** |
 | `check-existing-data.ts` | Database inspection | ✅ Available |
 | `setup-db.ts` | Database management | ✅ Available |
+| `migrate-user-data.ts` | Legacy interactive CLI | ⚠️ **Deprecated** |
+| `migrate-user-data-cli.ts` | Legacy CLI tool | ⚠️ **Deprecated** |
 
 ## Support
 
